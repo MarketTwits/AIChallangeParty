@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Running Coach - Виртуальный тренер по бегу | SportSauce</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #3D528B;
+            --primary-light: #5470B0;
+            --primary-dark: #2A3B66;
+            --accent-color: #FF6B35;
+        }
+
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: #ffffff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: var(--primary-color);
+            box-shadow: 0 4px 20px rgba(61, 82, 139, 0.15);
+        }
+
+        .hero-section {
+            background: linear-gradient(135deg, #F8F9FF 0%, #E8ECFF 100%);
+            border-bottom: 1px solid rgba(61, 82, 139, 0.1);
+        }
+
+        .chat-container {
+            background: white;
+            border: 2px solid #E5E7EB;
+            border-radius: 20px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .message {
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(15px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(61, 82, 139, 0.25);
+        }
+
+        .assistant-message {
+            background: #F9FAFB;
+            border: 1px solid #E5E7EB;
+            color: #1F2937;
+        }
+
+        .quick-prompt {
+            background: white;
+            border: 2px solid var(--primary-color);
+            color: var(--primary-color);
+            transition: all 0.3s ease;
+        }
+
+        .quick-prompt:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(61, 82, 139, 0.25);
+        }
+
+        .send-button {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            transition: all 0.3s ease;
+        }
+
+        .send-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(61, 82, 139, 0.35);
+        }
+
+        .send-button:active {
+            transform: translateY(0);
+        }
+
+        .loading-dots span {
+            animation: dotBounce 1.4s infinite both;
+            background: var(--primary-color);
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes dotBounce {
+            0%, 80%, 100% {
+                opacity: 0.4;
+                transform: scale(0.8);
+            }
+            40% {
+                opacity: 1;
+                transform: scale(1.2);
+            }
+        }
+
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal-content {
+            animation: modalScale 0.4s ease-out;
+            background: white;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes modalScale {
+            from {
+                opacity: 0;
+                transform: scale(0.9) translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
+        }
+
+        .message-counter {
+            background: #10B981;
+            color: white;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+        }
+
+        input, textarea {
+            color: #1F2937 !important;
+            background: white;
+            border: 2px solid #D1D5DB;
+            transition: all 0.3s ease;
+        }
+
+        input::placeholder, textarea::placeholder {
+            color: #9CA3AF !important;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 4px rgba(61, 82, 139, 0.1);
+        }
+
+        .avatar {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-light) 100%);
+            box-shadow: 0 4px 12px rgba(61, 82, 139, 0.3);
+        }
+
+        .markdown-content h1,
+        .markdown-content h2,
+        .markdown-content h3 {
+            color: var(--primary-color);
+            font-weight: 700;
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+        }
+
+        .markdown-content h1 { font-size: 1.75rem; }
+        .markdown-content h2 { font-size: 1.5rem; }
+        .markdown-content h3 { font-size: 1.25rem; }
+
+        .markdown-content p {
+            margin-bottom: 1em;
+            line-height: 1.7;
+            color: #374151;
+        }
+
+        .markdown-content ul,
+        .markdown-content ol {
+            margin-bottom: 1em;
+            padding-left: 1.5em;
+        }
+
+        .markdown-content li {
+            margin-bottom: 0.5em;
+            color: #374151;
+        }
+
+        .markdown-content code {
+            background: #F3F4F6;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9em;
+            color: var(--primary-color);
+        }
+
+        .markdown-content pre {
+            background: #F9FAFB;
+            padding: 1em;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin-bottom: 1em;
+            border: 1px solid #E5E7EB;
+        }
+
+        .markdown-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .markdown-content strong {
+            color: var(--primary-color);
+            font-weight: 600;
+        }
+
+        .markdown-content em {
+            color: #6B7280;
+            font-style: italic;
+        }
+
+        .markdown-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 1em;
+            margin: 1em 0;
+            color: #6B7280;
+            font-style: italic;
+        }
+
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+
+        .scroll-smooth::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .scroll-smooth::-webkit-scrollbar-track {
+            background: #F3F4F6;
+            border-radius: 10px;
+        }
+
+        .scroll-smooth::-webkit-scrollbar-thumb {
+            background: var(--primary-color);
+            border-radius: 10px;
+        }
+
+        .scroll-smooth::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-dark);
+        }
+
+        footer {
+            background: #F9FAFB;
+            border-top: 1px solid #E5E7EB;
+            margin-top: auto;
+        }
+
+        .footer-link {
+            color: #6B7280;
+            transition: color 0.3s ease;
+        }
+
+        .footer-link:hover {
+            color: var(--primary-color);
+        }
+
+        .nav-link {
+            color: white;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: white;
+            transition: width 0.3s ease;
+        }
+
+        .nav-link:hover::after {
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <a href="https://sportsauce.ru" target="_blank" class="flex items-center space-x-3">
+                        <img src="assets/icon.png" alt="SportSauce Logo" class="h-12 w-12">
+                        <div class="text-white">
+                            <div class="text-xl font-bold">AI Running Coach</div>
+                            <div class="text-xs opacity-90">powered by SportSauce</div>
+                        </div>
+                    </a>
+                </div>
+                <nav class="hidden md:flex items-center space-x-6">
+                    <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
+                    <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
+                    <a href="https://sportsauce.ru/starts" target="_blank" class="nav-link text-sm font-medium">Старты</a>
+                </nav>
+                <div id="message-counter" class="message-counter px-4 py-2 rounded-full font-bold text-sm">
+                    <span id="remaining-count">10</span> / 10
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero-section py-8 md:py-12">
+        <div class="container mx-auto px-4 md:px-6">
+            <div class="flex flex-col md:flex-row items-center justify-between max-w-6xl mx-auto">
+                <div class="md:w-1/2 mb-6 md:mb-0 text-center md:text-left">
+                    <h1 class="text-3xl md:text-5xl font-black mb-3 md:mb-4" style="color: var(--primary-color);">
+                        Виртуальный тренер<br>по бегу
+                    </h1>
+                    <p class="text-base md:text-lg text-gray-600 mb-4 md:mb-6">
+                        Получите персональный план тренировок от AI-тренера. Бесплатно, быстро, эффективно!
+                    </p>
+                    <div class="flex flex-col sm:flex-row items-center justify-center md:justify-start space-y-2 sm:space-y-0 sm:space-x-4">
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 mr-2" style="color: var(--primary-color);" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="text-sm text-gray-600">Персональный подход</span>
+                        </div>
+                        <div class="flex items-center">
+                            <svg class="w-5 h-5 mr-2" style="color: var(--primary-color);" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                            </svg>
+                            <span class="text-sm text-gray-600">Профессиональные советы</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="md:w-1/2 flex justify-center space-x-2 md:space-x-4">
+                    <img src="assets/funny_coach.png" alt="AI Running Coach" class="w-1/2 md:max-w-xs rounded-2xl md:rounded-3xl shadow-lg">
+                    <img src="assets/ski_coach.png" alt="AI Ski Coach" class="w-1/2 md:max-w-xs rounded-2xl md:rounded-3xl shadow-lg">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Main Content -->
+    <main class="flex-1 py-4 md:py-8">
+        <div class="container mx-auto px-3 md:px-6">
+            <div class="chat-container p-3 md:p-6 mb-4 md:mb-8">
+                <div id="messages" class="overflow-y-auto space-y-4 md:space-y-6 scroll-smooth mb-4 md:mb-6" style="max-height: 400px; md:max-height: 500px;">
+                    <div class="flex items-start space-x-4 message">
+                        <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                            AI
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">Виртуальный тренер</p>
+                            <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
+                                <p class="text-gray-700 leading-relaxed mb-4">
+                                    Привет! 👋 Я - твой персональный AI-тренер по бегу. Готов помочь составить индивидуальный план тренировок!
+                                </p>
+                                <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                    <p class="font-semibold mb-3 text-sm" style="color: var(--primary-color);">
+                                        📋 Расскажи мне о себе:
+                                    </p>
+                                    <ul class="space-y-2 text-sm text-gray-600">
+                                        <li class="flex items-start">
+                                            <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                            <span>Твой возраст и опыт бега</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                            <span>Сколько раз в неделю тренируешься</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                            <span>Какую максимальную дистанцию можешь пробежать</span>
+                                        </li>
+                                        <li class="flex items-start">
+                                            <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                            <span>Какая у тебя цель (5к, 10к, полумарафон, скорость, выносливость)</span>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="loading" class="hidden mb-6">
+                    <div class="flex items-start space-x-4">
+                        <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                            AI
+                        </div>
+                        <div class="assistant-message p-4 rounded-2xl rounded-tl-none">
+                            <div class="loading-dots flex space-x-2">
+                                <span class="w-3 h-3 rounded-full"></span>
+                                <span class="w-3 h-3 rounded-full"></span>
+                                <span class="w-3 h-3 rounded-full"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border-t border-gray-200 pt-4 md:pt-6">
+                    <form id="chat-form" class="space-y-3 md:space-y-4">
+                        <div class="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
+                            <input
+                                type="text"
+                                id="user-input"
+                                placeholder="Например: Мне 25 лет, новичок в беге..."
+                                class="flex-1 px-4 md:px-5 py-3 md:py-4 rounded-xl font-medium text-sm md:text-base"
+                                autocomplete="off"
+                            />
+                            <button
+                                type="submit"
+                                class="send-button text-white px-6 md:px-8 py-3 md:py-4 rounded-xl font-bold flex items-center justify-center space-x-2 text-sm md:text-base"
+                            >
+                                <span>Отправить</span>
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="flex flex-wrap gap-2">
+                            <button type="button" class="quick-prompt px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold">
+                                🏃 Я новичок
+                            </button>
+                            <button type="button" class="quick-prompt px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold">
+                                🎯 Пробежать 5км
+                            </button>
+                            <button type="button" class="quick-prompt px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold">
+                                🏅 Полумарафон
+                            </button>
+                            <button type="button" class="quick-prompt px-3 md:px-4 py-2 md:py-2.5 rounded-lg md:rounded-xl text-xs md:text-sm font-semibold">
+                                ⚡ Улучшить скорость
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-8">
+        <div class="container mx-auto px-6">
+            <div class="max-w-6xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+                    <div>
+                        <img src="assets/icon.png" alt="SportSauce" class="h-10 w-10 mb-4">
+                        <p class="text-sm text-gray-600">
+                            Виртуальный тренер по бегу от SportSauce
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-4" style="color: var(--primary-color);">О SportSauce</h4>
+                        <ul class="space-y-2">
+                            <li><a href="https://sportsauce.ru" target="_blank" class="footer-link text-sm">Главная</a></li>
+                            <li><a href="https://sportsauce.ru/clubs" target="_blank" class="footer-link text-sm">Спортивные клубы</a></li>
+                            <li><a href="https://sportsauce.ru/starts" target="_blank" class="footer-link text-sm">Старты</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-4" style="color: var(--primary-color);">Для спортсменов</h4>
+                        <ul class="space-y-2">
+                            <li><a href="https://sportsauce.ru/clubs" target="_blank" class="footer-link text-sm">Найти тренера</a></li>
+                            <li><a href="https://sportsauce.ru/starts" target="_blank" class="footer-link text-sm">Найти забег</a></li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="font-bold mb-4" style="color: var(--primary-color);">AI Coach</h4>
+                        <p class="text-sm text-gray-600">
+                            Получите персональный план тренировок от искусственного интеллекта
+                        </p>
+                    </div>
+                </div>
+                <div class="border-t border-gray-200 pt-6 text-center">
+                    <p class="text-sm text-gray-500">
+                        © 2024 <a href="https://sportsauce.ru" target="_blank" class="footer-link">SportSauce.ru</a> - Все права защищены
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Modal -->
+    <div id="limit-modal" class="hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50">
+        <div class="modal-content rounded-3xl max-w-md w-full p-8 text-center">
+            <div class="rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6" style="background: var(--primary-color);">
+                <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+            <h2 class="text-3xl font-black mb-4" style="color: var(--primary-color);">Лимит сообщений исчерпан</h2>
+            <p class="text-gray-600 mb-8 leading-relaxed">
+                Виртуальный тренер - это отличный старт, но для достижения лучших результатов рекомендуем обратиться к профессионалам!
+            </p>
+            <div class="space-y-3">
+                <a
+                    href="https://sportsauce.ru/clubs"
+                    target="_blank"
+                    class="block w-full send-button text-white py-4 rounded-xl font-bold"
+                >
+                    Найти тренера на SportSauce
+                </a>
+                <button
+                    id="close-modal"
+                    class="block w-full bg-gray-200 hover:bg-gray-300 text-gray-800 py-4 rounded-xl font-bold transition-all"
+                >
+                    Закрыть
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
