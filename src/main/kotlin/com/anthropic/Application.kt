@@ -41,7 +41,7 @@ fun main() {
             allowMethod(HttpMethod.Options)
         }
 
-        configureRouting(agent)
+        configureRouting(agent, client)
 
         routing {
             staticResources("/", "static")
