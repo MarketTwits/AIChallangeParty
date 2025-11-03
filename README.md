@@ -2,6 +2,10 @@
 
 Strict AI coach for running, cross-country skiing, and triathlon. Built with Kotlin/Ktor and Claude AI.
 
+<p align="center">
+    <img src="src/main/resources/static/assets/hot_coach.png">
+</p>
+
 ## Quick Deploy
 
 ### 1. Build (on your PC)
