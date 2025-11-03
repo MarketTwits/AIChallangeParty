@@ -2,9 +2,7 @@ version: '3.8'
 
 services:
   ai-coach:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ai-running-coach:latest
     container_name: ai-running-coach
     ports:
       - "8080:8080"
