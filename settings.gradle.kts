@@ -1,1 +1,1 @@
-rootProject.name = "anthropic-agent"
+rootProject.name = "AIChallangeParty"

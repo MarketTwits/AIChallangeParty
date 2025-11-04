@@ -1,4 +1,4 @@
-package com.anthropic
+package com.markettwits.aichallenge
 
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
@@ -14,16 +14,26 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
-fun Application.configureRouting(agent: Agent, anthropicClient: AnthropicClient) {
+fun Application.configureRouting(sessionManager: SessionManager, apiKey: String) {
     val logger = LoggerFactory.getLogger("Routes")
 
     routing {
         post("/chat") {
             try {
                 val request = call.receive<ChatRequest>()
-                logger.info("Received chat request: ${request.message}")
+                logger.info("Received chat request from session ${request.sessionId}: ${request.message}")
+
+                val agent = sessionManager.getOrCreateSession(request.sessionId) {
+                    AnthropicClient(apiKey)
+                }
+
                 val response = agent.chat(request.message)
-                call.respond(ChatResponse(response = response))
+                val remainingMessages = agent.getRemainingMessages()
+
+                call.respond(ChatResponse(
+                    response = response,
+                    remainingMessages = remainingMessages
+                ))
             } catch (e: Exception) {
                 logger.error("Error processing chat request", e)
                 call.respond(

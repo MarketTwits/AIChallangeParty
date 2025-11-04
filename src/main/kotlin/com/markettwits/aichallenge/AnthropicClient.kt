@@ -1,4 +1,4 @@
-package com.anthropic
+package com.markettwits.aichallenge
 
 import io.ktor.client.*
 import io.ktor.client.call.*
