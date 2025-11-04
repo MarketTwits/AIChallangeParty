@@ -7,8 +7,77 @@ const limitModal = document.getElementById('limit-modal');
 const closeModalBtn = document.getElementById('close-modal');
 const remainingCountEl = document.getElementById('remaining-count');
 const messageCounterEl = document.getElementById('message-counter');
+const chatContainer = document.getElementById('chat-container');
+const chatBackdrop = document.getElementById('chat-backdrop');
+const expandIndicator = document.querySelector('.expand-indicator');
 
 let remainingMessages = 10;
+
+function getOrCreateSessionId() {
+    let sessionId = sessionStorage.getItem('sessionId');
+    if (!sessionId) {
+        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionStorage.setItem('sessionId', sessionId);
+    }
+    return sessionId;
+}
+
+const sessionId = getOrCreateSessionId();
+
+let isExpanded = false;
+
+function toggleChatExpand(expand) {
+    isExpanded = expand;
+
+    if (expand) {
+        chatContainer.classList.add('expanded');
+        chatBackdrop.classList.add('active');
+        document.body.style.overflow = 'hidden';
+
+        messagesContainer.style.maxHeight = 'calc(100vh - 320px)';
+        expandIndicator.innerHTML = `
+            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+            Свернуть
+        `;
+    } else {
+        chatContainer.classList.remove('expanded');
+        chatBackdrop.classList.remove('active');
+        document.body.style.overflow = '';
+
+        messagesContainer.style.maxHeight = '400px';
+        expandIndicator.innerHTML = `
+            <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+            </svg>
+            Развернуть
+        `;
+    }
+
+    setTimeout(scrollToBottom, 100);
+}
+
+expandIndicator.addEventListener('click', (e) => {
+    e.stopPropagation();
+    toggleChatExpand(!isExpanded);
+});
+
+chatBackdrop.addEventListener('click', () => {
+    toggleChatExpand(false);
+});
+
+chatContainer.addEventListener('click', (e) => {
+    if (!isExpanded && e.target === chatContainer) {
+        toggleChatExpand(true);
+    }
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isExpanded) {
+        toggleChatExpand(false);
+    }
+});
 
 marked.setOptions({
     breaks: true,
@@ -31,7 +100,10 @@ chatForm.addEventListener('submit', async (e) => {
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ message })
+            body: JSON.stringify({
+                message,
+                sessionId
+            })
         });
 
         if (!response.ok) {
@@ -49,8 +121,10 @@ chatForm.addEventListener('submit', async (e) => {
 
         addMessage('assistant', data.response);
 
-        remainingMessages--;
-        updateMessageCounter();
+        if (data.remainingMessages !== undefined && data.remainingMessages !== null) {
+            remainingMessages = data.remainingMessages;
+            updateMessageCounter();
+        }
 
         if (remainingMessages <= 0) {
             showLimitModal();
@@ -302,3 +376,143 @@ function scrollToBottom() {
 }
 
 userInput.focus();
+
+function addTypingEffect(element, text, speed = 20) {
+    return new Promise((resolve) => {
+        let i = 0;
+        element.textContent = '';
+
+        const interval = setInterval(() => {
+            if (i < text.length) {
+                element.textContent += text.charAt(i);
+                i++;
+            } else {
+                clearInterval(interval);
+                resolve();
+            }
+        }, speed);
+    });
+}
+
+function addButtonClickEffect(button) {
+    button.style.transform = 'scale(0.95)';
+    setTimeout(() => {
+        button.style.transform = '';
+    }, 150);
+}
+
+quickPrompts.forEach(button => {
+    button.addEventListener('mousedown', () => {
+        addButtonClickEffect(button);
+    });
+});
+
+const sendButton = document.querySelector('.send-button');
+sendButton.addEventListener('mousedown', () => {
+    addButtonClickEffect(sendButton);
+});
+
+userInput.addEventListener('input', () => {
+    userInput.style.height = 'auto';
+    userInput.style.height = userInput.scrollHeight + 'px';
+});
+
+let isTyping = false;
+let typingTimeout;
+
+userInput.addEventListener('keydown', (e) => {
+    if (!isTyping) {
+        isTyping = true;
+        userInput.style.borderColor = 'var(--primary-color)';
+    }
+
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => {
+        isTyping = false;
+        userInput.style.borderColor = '';
+    }, 1000);
+
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        chatForm.dispatchEvent(new Event('submit'));
+    }
+});
+
+function addMessageWithAnimation(role, content) {
+    const messageWrapper = document.createElement('div');
+    messageWrapper.className = `message ${role === 'user' ? 'flex justify-end' : ''}`;
+    messageWrapper.style.opacity = '0';
+    messageWrapper.style.transform = 'translateY(20px)';
+
+    if (role === 'user') {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'user-message p-4 rounded-2xl rounded-tr-none max-w-3xl text-white font-medium';
+        messageDiv.textContent = content;
+        messageWrapper.appendChild(messageDiv);
+    } else {
+        const flexContainer = document.createElement('div');
+        flexContainer.className = 'flex items-start space-x-4';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white';
+        avatar.textContent = 'AI';
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'flex-1 max-w-4xl';
+
+        const label = document.createElement('p');
+        label.className = 'font-bold text-sm text-blue-400 mb-2';
+        label.textContent = 'Виртуальный тренер';
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'assistant-message p-5 rounded-2xl rounded-tl-none';
+
+        try {
+            const jsonContent = JSON.parse(content);
+            messageDiv.innerHTML = formatJSON(jsonContent);
+        } catch {
+            const markdownDiv = document.createElement('div');
+            markdownDiv.className = 'markdown-content';
+            markdownDiv.innerHTML = marked.parse(content);
+            messageDiv.appendChild(markdownDiv);
+        }
+
+        contentWrapper.appendChild(label);
+        contentWrapper.appendChild(messageDiv);
+        flexContainer.appendChild(avatar);
+        flexContainer.appendChild(contentWrapper);
+        messageWrapper.appendChild(flexContainer);
+    }
+
+    messagesContainer.appendChild(messageWrapper);
+
+    requestAnimationFrame(() => {
+        messageWrapper.style.transition = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+        messageWrapper.style.opacity = '1';
+        messageWrapper.style.transform = 'translateY(0)';
+    });
+
+    scrollToBottom();
+}
+
+let messageQueue = [];
+let isProcessingQueue = false;
+
+async function processMessageQueue() {
+    if (isProcessingQueue || messageQueue.length === 0) return;
+
+    isProcessingQueue = true;
+
+    while (messageQueue.length > 0) {
+        const { role, content } = messageQueue.shift();
+        addMessageWithAnimation(role, content);
+        await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    isProcessingQueue = false;
+}
+
+function queueMessage(role, content) {
+    messageQueue.push({ role, content });
+    processMessageQueue();
+}

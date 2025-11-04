@@ -1,4 +1,4 @@
-package com.anthropic
+package com.markettwits.aichallenge
 
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.http.*
@@ -20,8 +20,7 @@ fun main() {
     val apiKey = dotenv["ANTHROPIC_API_KEY"]
         ?: throw IllegalStateException("ANTHROPIC_API_KEY not found in .env file")
 
-    val client = AnthropicClient(apiKey)
-    val agent = Agent(client)
+    val sessionManager = SessionManager()
 
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         install(ContentNegotiation) {
@@ -41,7 +40,7 @@ fun main() {
             allowMethod(HttpMethod.Options)
         }
 
-        configureRouting(agent, client)
+        configureRouting(sessionManager, apiKey)
 
         routing {
             staticResources("/", "static")

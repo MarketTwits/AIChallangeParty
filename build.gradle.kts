@@ -32,7 +32,7 @@ dependencies {
 }
 
 application {
-    mainClass.set("com.anthropic.ApplicationKt")
+    mainClass.set("com.markettwits.aichallenge.ApplicationKt")
 }
 
 tasks.test {

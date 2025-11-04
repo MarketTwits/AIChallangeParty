@@ -46,6 +46,71 @@
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
             max-width: 1200px;
             margin: 0 auto;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+        }
+
+        .chat-container:hover {
+            box-shadow: 0 15px 50px rgba(0, 0, 0, 0.12);
+            transform: translateY(-2px);
+        }
+
+        .chat-container.expanded {
+            position: fixed;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 95%;
+            max-width: 1400px;
+            height: calc(100vh - 100px);
+            z-index: 1000;
+            cursor: default;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.25);
+        }
+
+        .chat-container.expanded:hover {
+            transform: translateX(-50%);
+        }
+
+        .chat-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .chat-backdrop.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .expand-indicator {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--primary-color);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0.7;
+            transition: all 0.3s ease;
+            pointer-events: none;
+        }
+
+        .chat-container:hover .expand-indicator {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .chat-container.expanded .expand-indicator {
+            display: none;
         }
 
         .message {
@@ -333,7 +398,7 @@
                         <img src="assets/icon.png" alt="SportSauce Logo" class="h-12 w-12">
                         <div class="text-white">
                             <div class="text-xl font-bold">AI Running Coach</div>
-                            <div class="text-xs opacity-90">powered by SportSauce</div>
+                            <div class="text-xs opacity-90">powered by MarketTwits</div>
                         </div>
                     </a>
                 </div>
@@ -383,11 +448,20 @@
         </div>
     </section>
 
+    <!-- Chat Backdrop -->
+    <div id="chat-backdrop" class="chat-backdrop"></div>
+
     <!-- Main Content -->
     <main class="flex-1 py-4 md:py-8">
         <div class="container mx-auto px-3 md:px-6">
-            <div class="chat-container p-3 md:p-6 mb-4 md:mb-8">
-                <div id="messages" class="overflow-y-auto space-y-4 md:space-y-6 scroll-smooth mb-4 md:mb-6" style="max-height: 400px; md:max-height: 500px;">
+            <div id="chat-container" class="chat-container p-3 md:p-6 mb-4 md:mb-8">
+                <div class="expand-indicator">
+                    <svg class="w-4 h-4 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path>
+                    </svg>
+                    Развернуть
+                </div>
+                <div id="messages" class="overflow-y-auto space-y-4 md:space-y-6 scroll-smooth mb-4 md:mb-6" style="max-height: 400px;">
                     <div class="flex items-start space-x-4 message">
                         <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
                             AI

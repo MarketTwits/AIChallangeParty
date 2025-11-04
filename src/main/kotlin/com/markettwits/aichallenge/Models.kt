@@ -1,17 +1,18 @@
-package com.anthropic
+package com.markettwits.aichallenge
 
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class ChatRequest(
-    val message: String
+    val message: String,
+    val sessionId: String
 )
 
 @Serializable
 data class ChatResponse(
-    val response: String
+    val response: String,
+    val remainingMessages: Int? = null
 )
 
 @Serializable

@@ -1,4 +1,4 @@
-package com.anthropic
+package com.markettwits.aichallenge
 
 import org.slf4j.LoggerFactory
 
