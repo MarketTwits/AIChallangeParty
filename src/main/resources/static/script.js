@@ -12,6 +12,47 @@ const chatBackdrop = document.getElementById('chat-backdrop');
 const expandIndicator = document.querySelector('.expand-indicator');
 
 let remainingMessages = 10;
+let currentCoachStyle = 'default';
+
+function loadCoachStyle() {
+    const saved = localStorage.getItem('coachStyle');
+    if (saved) {
+        currentCoachStyle = saved;
+        const buttons = document.querySelectorAll('.coach-style-btn');
+        buttons.forEach(btn => {
+            if (btn.dataset.style === currentCoachStyle) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+}
+
+function setCoachStyle(style) {
+    if (currentCoachStyle !== style && messagesContainer.children.length > 1) {
+        const confirmed = confirm('При смене стиля тренера чат будет очищен. Продолжить?');
+        if (!confirmed) {
+            return;
+        }
+        while (messagesContainer.children.length > 1) {
+            messagesContainer.removeChild(messagesContainer.lastChild);
+        }
+    }
+
+    currentCoachStyle = style;
+    localStorage.setItem('coachStyle', style);
+    const buttons = document.querySelectorAll('.coach-style-btn');
+    buttons.forEach(btn => {
+        if (btn.dataset.style === style) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+}
+
+loadCoachStyle();
 
 function getOrCreateSessionId() {
     let sessionId = sessionStorage.getItem('sessionId');
@@ -102,7 +143,8 @@ chatForm.addEventListener('submit', async (e) => {
             },
             body: JSON.stringify({
                 message,
-                sessionId
+                sessionId,
+                coachStyle: currentCoachStyle
             })
         });
 
@@ -119,7 +161,7 @@ chatForm.addEventListener('submit', async (e) => {
             return;
         }
 
-        addMessage('assistant', data.response);
+        addMessage('assistant', data.response, data.structuredResponse);
 
         if (data.remainingMessages !== undefined && data.remainingMessages !== null) {
             remainingMessages = data.remainingMessages;
@@ -161,6 +203,12 @@ limitModal.addEventListener('click', (e) => {
     }
 });
 
+document.querySelectorAll('.coach-style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        setCoachStyle(btn.dataset.style);
+    });
+});
+
 function updateMessageCounter() {
     remainingCountEl.textContent = remainingMessages;
 
@@ -177,7 +225,7 @@ function showLimitModal() {
     limitModal.classList.remove('hidden');
 }
 
-function addMessage(role, content) {
+function addMessage(role, content, structuredResponse = null) {
     const messageWrapper = document.createElement('div');
     messageWrapper.className = `message ${role === 'user' ? 'flex justify-end' : ''}`;
 
@@ -204,14 +252,22 @@ function addMessage(role, content) {
         const messageDiv = document.createElement('div');
         messageDiv.className = 'assistant-message p-5 rounded-2xl rounded-tl-none';
 
-        try {
-            const jsonContent = JSON.parse(content);
-            messageDiv.innerHTML = formatJSON(jsonContent);
-        } catch {
-            const markdownDiv = document.createElement('div');
-            markdownDiv.className = 'markdown-content';
-            markdownDiv.innerHTML = marked.parse(content);
-            messageDiv.appendChild(markdownDiv);
+        if (structuredResponse) {
+            messageDiv.innerHTML = formatStructuredResponse(structuredResponse);
+        } else {
+            try {
+                const jsonContent = JSON.parse(content);
+                if (jsonContent.answer) {
+                    messageDiv.innerHTML = formatStructuredResponse(jsonContent);
+                } else {
+                    messageDiv.innerHTML = formatJSON(jsonContent);
+                }
+            } catch {
+                const markdownDiv = document.createElement('div');
+                markdownDiv.className = 'markdown-content';
+                markdownDiv.innerHTML = marked.parse(content);
+                messageDiv.appendChild(markdownDiv);
+            }
         }
 
         contentWrapper.appendChild(label);
@@ -223,6 +279,61 @@ function addMessage(role, content) {
 
     messagesContainer.appendChild(messageWrapper);
     scrollToBottom();
+}
+
+function formatStructuredResponse(response) {
+    let html = '';
+
+    if (response.tag) {
+        const tagEmojis = {
+            'greeting': '👋',
+            'assessment': '📊',
+            'plan': '📋',
+            'recovery': '💚',
+            'motivation': '🔥',
+            'error': '⚠️'
+        };
+        const tagColors = {
+            'greeting': 'bg-blue-500',
+            'assessment': 'bg-green-500',
+            'plan': 'bg-purple-500',
+            'recovery': 'bg-pink-500',
+            'motivation': 'bg-orange-500',
+            'error': 'bg-red-500'
+        };
+        const emoji = tagEmojis[response.tag] || '💬';
+        const tagColor = tagColors[response.tag] || 'bg-gray-500';
+        html += `<div class="mb-3 flex items-center justify-between">`;
+        html += `<span class="${tagColor} text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">${emoji} ${response.tag}</span>`;
+        if (response.answerTimestamp) {
+            const date = new Date(response.answerTimestamp);
+            const timeStr = date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+            html += `<span class="text-xs text-gray-400">${timeStr}</span>`;
+        }
+        html += `</div>`;
+    }
+
+    const answerText = response.answer
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0)
+        .join('\n\n');
+
+    const markdownDiv = document.createElement('div');
+    markdownDiv.className = 'markdown-content';
+    markdownDiv.innerHTML = marked.parse(answerText);
+    html += markdownDiv.outerHTML;
+
+    if (response.nextAction) {
+        html += `<div class="mt-4 inline-block">`;
+        html += `<div style="background: #E5F4FE; color: #2E3F6E;" class="px-4 py-2 rounded-lg shadow-md inline-flex items-center gap-2">`;
+        html += `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path></svg>`;
+        html += `<span class="text-sm font-semibold">${response.nextAction}</span>`;
+        html += `</div>`;
+        html += `</div>`;
+    }
+
+    return html;
 }
 
 function formatJSON(obj) {

@@ -6,13 +6,25 @@ import kotlinx.serialization.json.JsonObject
 @Serializable
 data class ChatRequest(
     val message: String,
-    val sessionId: String
+    val sessionId: String,
+    val coachStyle: String? = "default"
 )
 
 @Serializable
 data class ChatResponse(
     val response: String,
-    val remainingMessages: Int? = null
+    val remainingMessages: Int? = null,
+    val structuredResponse: StructuredLLMResponse? = null
+)
+
+@Serializable
+data class StructuredLLMResponse(
+    val tag: String,
+    val answer: String,
+    val answerTimestamp: String,
+    val coachMood: String? = null,
+    val intensityLevel: String? = null,
+    val nextAction: String? = null
 )
 
 @Serializable
