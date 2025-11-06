@@ -82,6 +82,7 @@ object Tools {
         )
     }
 
+
     private fun getRecoveryRecommendationsTool(): Tool {
         return Tool(
             name = "get_recovery_recommendations",
@@ -348,4 +349,5 @@ object Tools {
             put("injury_prevention", injuryPrevention)
         }.toString()
     }
+
 }
