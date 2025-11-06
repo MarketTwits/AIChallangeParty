@@ -27,8 +27,6 @@ fun main() {
             json(Json {
                 ignoreUnknownKeys = true
                 isLenient = true
-                encodeDefaults = false
-                explicitNulls = false
             })
         }
 
