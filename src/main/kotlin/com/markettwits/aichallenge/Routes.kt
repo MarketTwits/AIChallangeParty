@@ -27,12 +27,13 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String)
                     AnthropicClient(apiKey)
                 }
 
-                val response = agent.chat(request.message)
+                val (response, structuredResponse) = agent.chat(request.message, request.coachStyle ?: "default")
                 val remainingMessages = agent.getRemainingMessages()
 
                 call.respond(ChatResponse(
                     response = response,
-                    remainingMessages = remainingMessages
+                    remainingMessages = remainingMessages,
+                    structuredResponse = structuredResponse
                 ))
             } catch (e: Exception) {
                 logger.error("Error processing chat request", e)
