@@ -24,7 +24,8 @@ data class StructuredLLMResponse(
     val answerTimestamp: String,
     val coachMood: String? = null,
     val intensityLevel: String? = null,
-    val nextAction: String? = null
+    val nextAction: String? = null,
+    val planCreated: Boolean? = false
 )
 
 @Serializable
