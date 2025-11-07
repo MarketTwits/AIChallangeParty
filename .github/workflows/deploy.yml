@@ -1,0 +1,45 @@
+name: Deploy to VPS
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: |
+          docker build --platform linux/amd64 -t ai-running-coach:latest .
+
+      - name: Save Docker image
+        run: |
+          docker save ai-running-coach:latest | gzip > ai-running-coach.tar.gz
+
+      - name: Deploy to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: "ai-running-coach.tar.gz"
+          target: "~/ai-coauch/"
+
+      - name: Load and restart container on VPS
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd ~/ai-coauch
+            gunzip -c ai-running-coach.tar.gz | docker load
+            docker compose down
+            docker compose up -d
+            docker system prune -f
