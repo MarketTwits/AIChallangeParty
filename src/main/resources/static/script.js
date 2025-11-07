@@ -627,3 +627,186 @@ function queueMessage(role, content) {
     messageQueue.push({ role, content });
     processMessageQueue();
 }
+
+let currentReasoningMode = 'direct';
+let reasoningSessionIds = {
+    direct: 'reasoning_direct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    stepByStep: 'reasoning_step_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    aiPrompt: 'reasoning_prompt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    experts: 'reasoning_experts_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+};
+
+let reasoningMessageHistory = {
+    direct: [],
+    stepByStep: [],
+    aiPrompt: [],
+    experts: []
+};
+
+function initReasoningTab() {
+    console.log('Initializing reasoning tab...');
+    const tabTraining = document.getElementById('tab-training');
+    const tabReasoning = document.getElementById('tab-reasoning');
+    const trainingContent = document.getElementById('training-content');
+    const reasoningContent = document.getElementById('reasoning-content');
+
+    console.log('Elements:', {
+        tabTraining: !!tabTraining,
+        tabReasoning: !!tabReasoning,
+        trainingContent: !!trainingContent,
+        reasoningContent: !!reasoningContent
+    });
+
+    if (!tabTraining || !tabReasoning || !trainingContent || !reasoningContent) {
+        console.error('Tab elements not found!', {
+            tabTraining, tabReasoning, trainingContent, reasoningContent
+        });
+        return;
+    }
+
+    function switchTab(tab) {
+        console.log('Switching to tab:', tab);
+        if (tab === 'training') {
+            tabTraining.classList.add('active-tab');
+            tabReasoning.classList.remove('active-tab');
+            trainingContent.classList.add('active');
+            reasoningContent.classList.remove('active');
+        } else {
+            tabReasoning.classList.add('active-tab');
+            tabTraining.classList.remove('active-tab');
+            reasoningContent.classList.add('active');
+            trainingContent.classList.remove('active');
+        }
+        console.log('Tab switched successfully');
+    }
+
+    tabTraining.addEventListener('click', () => {
+        console.log('Training tab clicked');
+        switchTab('training');
+    });
+    tabReasoning.addEventListener('click', () => {
+        console.log('Reasoning tab clicked');
+        switchTab('reasoning');
+    });
+
+    console.log('Event listeners attached successfully');
+}
+
+document.addEventListener('DOMContentLoaded', initReasoningTab);
+
+function initReasoningChat() {
+    const reasoningModeBtns = document.querySelectorAll('.reasoning-mode-btn');
+    reasoningModeBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            reasoningModeBtns.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            const newMode = btn.dataset.mode;
+            if (newMode !== currentReasoningMode) {
+                currentReasoningMode = newMode;
+                restoreReasoningHistory(newMode);
+            }
+        });
+    });
+
+    const reasoningForm = document.getElementById('reasoning-form');
+    const reasoningInput = document.getElementById('reasoning-input');
+    const reasoningMessagesContainer = document.getElementById('reasoning-messages');
+    const reasoningLoadingIndicator = document.getElementById('reasoning-loading');
+
+    if (!reasoningForm || !reasoningInput || !reasoningMessagesContainer || !reasoningLoadingIndicator) {
+        console.error('Reasoning chat elements not found');
+        return;
+    }
+
+    function addReasoningMessage(role, content, saveToHistory = true) {
+        const messageEl = document.createElement('div');
+        messageEl.className = 'flex items-start space-x-4 message';
+
+        if (role === 'user') {
+            messageEl.innerHTML = `
+                <div class="flex-1"></div>
+                <div class="user-message p-4 rounded-2xl rounded-tr-none max-w-2xl">
+                    <p class="text-white leading-relaxed">${escapeHtml(content)}</p>
+                </div>
+                <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                    U
+                </div>
+            `;
+        } else {
+            const formattedContent = typeof marked !== 'undefined' ? marked.parse(content) : content.replace(/\n/g, '<br>');
+            messageEl.innerHTML = `
+                <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                    AI
+                </div>
+                <div class="flex-1">
+                    <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">AI Ассистент</p>
+                    <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
+                        <div class="markdown-content text-gray-700 leading-relaxed">${formattedContent}</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        reasoningMessagesContainer.appendChild(messageEl);
+        reasoningMessagesContainer.scrollTop = reasoningMessagesContainer.scrollHeight;
+
+        if (saveToHistory) {
+            reasoningMessageHistory[currentReasoningMode].push({role, content});
+        }
+    }
+
+    function restoreReasoningHistory(mode) {
+        while (reasoningMessagesContainer.children.length > 1) {
+            reasoningMessagesContainer.removeChild(reasoningMessagesContainer.lastChild);
+        }
+
+        const history = reasoningMessageHistory[mode];
+        if (history && history.length > 0) {
+            history.forEach(msg => {
+                addReasoningMessage(msg.role, msg.content, false);
+            });
+        }
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    reasoningForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = reasoningInput.value.trim();
+        if (!message) return;
+
+        addReasoningMessage('user', message);
+        reasoningInput.value = '';
+        reasoningLoadingIndicator.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/reasoning-chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    sessionId: reasoningSessionIds[currentReasoningMode],
+                    reasoningMode: currentReasoningMode
+                })
+            });
+
+            const data = await response.json();
+            reasoningLoadingIndicator.classList.add('hidden');
+
+            addReasoningMessage('assistant', data.response);
+        } catch (error) {
+            reasoningLoadingIndicator.classList.add('hidden');
+            addReasoningMessage('assistant', 'Произошла ошибка при обработке запроса');
+            console.error('Error:', error);
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initReasoningChat);

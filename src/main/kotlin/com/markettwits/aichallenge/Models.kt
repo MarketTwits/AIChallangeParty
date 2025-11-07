@@ -11,6 +11,28 @@ data class ChatRequest(
 )
 
 @Serializable
+data class ReasoningChatRequest(
+    val message: String,
+    val sessionId: String,
+    val reasoningMode: String = "direct",
+)
+
+@Serializable
+data class ReasoningChatResponse(
+    val response: String,
+    val reasoningMode: String,
+    val timestamp: String,
+    val experts: List<ExpertOpinion>? = null,
+)
+
+@Serializable
+data class ExpertOpinion(
+    val expertName: String,
+    val opinion: String,
+    val confidence: Int,
+)
+
+@Serializable
 data class ChatResponse(
     val response: String,
     val remainingMessages: Int? = null,
