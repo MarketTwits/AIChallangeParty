@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory
 
 fun Application.configureRouting(sessionManager: SessionManager, apiKey: String) {
     val logger = LoggerFactory.getLogger("Routes")
+    val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
 
     routing {
         post("/chat") {
@@ -77,6 +78,42 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String)
                 proxyClient.close()
             } catch (e: Exception) {
                 logger.error("Error proxying to Anthropic API", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/reasoning-chat") {
+            try {
+                val request = call.receive<ReasoningChatRequest>()
+                logger.info("Received reasoning chat request from session ${request.sessionId}: ${request.message}, mode: ${request.reasoningMode}")
+
+                val agent = reasoningAgents.getOrPut(request.sessionId) {
+                    ReasoningAgent(AnthropicClient(apiKey))
+                }
+
+                val response = agent.chat(request.message, request.sessionId, request.reasoningMode)
+
+                call.respond(response)
+            } catch (e: Exception) {
+                logger.error("Error processing reasoning chat request", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/reasoning-chat/clear") {
+            try {
+                val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+                reasoningAgents[sessionId]?.clearHistory(sessionId)
+                reasoningAgents.remove(sessionId)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "cleared"))
+            } catch (e: Exception) {
+                logger.error("Error clearing reasoning chat session", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to e.message)
