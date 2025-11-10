@@ -9,24 +9,33 @@ class ReasoningAgent(private val client: AnthropicClient) {
     private val conversationHistory = mutableMapOf<String, MutableList<Message>>()
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
-    suspend fun chat(userMessage: String, sessionId: String, reasoningMode: String): ReasoningChatResponse {
-        logger.info("Received message in reasoning mode: $reasoningMode")
+    suspend fun chat(
+        userMessage: String,
+        sessionId: String,
+        reasoningMode: String,
+        temperature: Double? = null,
+    ): ReasoningChatResponse {
+        logger.info("Received message in reasoning mode: $reasoningMode, temperature: $temperature")
 
         val history = conversationHistory.getOrPut(sessionId) { mutableListOf() }
 
         val response = when (reasoningMode) {
-            "direct" -> directResponse(userMessage, history)
-            "stepByStep" -> stepByStepResponse(userMessage, history)
-            "aiPrompt" -> aiPromptResponse(userMessage, history)
-            "experts" -> expertsResponse(userMessage, history)
-            else -> directResponse(userMessage, history)
+            "direct" -> directResponse(userMessage, history, temperature)
+            "stepByStep" -> stepByStepResponse(userMessage, history, temperature)
+            "aiPrompt" -> aiPromptResponse(userMessage, history, temperature)
+            "experts" -> expertsResponse(userMessage, history, temperature)
+            else -> directResponse(userMessage, history, temperature)
         }
 
         return response
     }
 
-    private suspend fun directResponse(userMessage: String, history: MutableList<Message>): ReasoningChatResponse {
-        logger.info("Using direct response mode")
+    private suspend fun directResponse(
+        userMessage: String,
+        history: MutableList<Message>,
+        temperature: Double? = null,
+    ): ReasoningChatResponse {
+        logger.info("Using direct response mode with temperature: $temperature")
 
         history.add(
             Message(
@@ -37,7 +46,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
 
         val systemPrompt = "Ты - AI ассистент. Отвечай на вопросы кратко и по существу."
 
-        val response = client.sendMessage(history, emptyList(), systemPrompt)
+        val response = client.sendMessage(history, emptyList(), systemPrompt, temperature)
 
         val textResponse = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет ответа"
 
@@ -55,8 +64,12 @@ class ReasoningAgent(private val client: AnthropicClient) {
         )
     }
 
-    private suspend fun stepByStepResponse(userMessage: String, history: MutableList<Message>): ReasoningChatResponse {
-        logger.info("Using step-by-step response mode")
+    private suspend fun stepByStepResponse(
+        userMessage: String,
+        history: MutableList<Message>,
+        temperature: Double? = null,
+    ): ReasoningChatResponse {
+        logger.info("Using step-by-step response mode with temperature: $temperature")
 
         history.add(
             Message(
@@ -80,7 +93,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
             Вывод: [финальный ответ]
         """.trimIndent()
 
-        val response = client.sendMessage(history, emptyList(), systemPrompt)
+        val response = client.sendMessage(history, emptyList(), systemPrompt, temperature)
 
         val textResponse = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет ответа"
 
@@ -98,8 +111,12 @@ class ReasoningAgent(private val client: AnthropicClient) {
         )
     }
 
-    private suspend fun aiPromptResponse(userMessage: String, history: MutableList<Message>): ReasoningChatResponse {
-        logger.info("Using AI prompt generation mode")
+    private suspend fun aiPromptResponse(
+        userMessage: String,
+        history: MutableList<Message>,
+        temperature: Double? = null,
+    ): ReasoningChatResponse {
+        logger.info("Using AI prompt generation mode with temperature: $temperature")
 
         val promptGenerationRequest = "Создай оптимальный промпт для решения следующей задачи: $userMessage"
 
@@ -116,7 +133,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
             Ответь ТОЛЬКО промптом, без дополнительных объяснений.
         """.trimIndent()
 
-        val promptResponse = client.sendMessage(tempHistory, emptyList(), systemPrompt1)
+        val promptResponse = client.sendMessage(tempHistory, emptyList(), systemPrompt1, temperature)
         val generatedPrompt = promptResponse.content.firstOrNull { it.type == "text" }?.text ?: userMessage
 
         logger.info("Generated prompt: $generatedPrompt")
@@ -136,7 +153,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
             )
         )
 
-        val response = client.sendMessage(finalHistory, emptyList(), generatedPrompt)
+        val response = client.sendMessage(finalHistory, emptyList(), generatedPrompt, temperature)
 
         val textResponse = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет ответа"
 
@@ -159,8 +176,12 @@ class ReasoningAgent(private val client: AnthropicClient) {
         )
     }
 
-    private suspend fun expertsResponse(userMessage: String, history: MutableList<Message>): ReasoningChatResponse {
-        logger.info("Using experts panel mode")
+    private suspend fun expertsResponse(
+        userMessage: String,
+        history: MutableList<Message>,
+        temperature: Double? = null,
+    ): ReasoningChatResponse {
+        logger.info("Using experts panel mode with temperature: $temperature")
 
         history.add(
             Message(
@@ -186,7 +207,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
                 )
             )
 
-            val response = client.sendMessage(expertHistory, emptyList(), expertPrompt)
+            val response = client.sendMessage(expertHistory, emptyList(), expertPrompt, temperature)
             val opinion = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет мнения"
 
             expertOpinions.add(
@@ -219,7 +240,8 @@ class ReasoningAgent(private val client: AnthropicClient) {
             )
         )
 
-        val synthesisResponse = client.sendMessage(synthesisHistory, emptyList(), "Ты - модератор экспертной панели.")
+        val synthesisResponse =
+            client.sendMessage(synthesisHistory, emptyList(), "Ты - модератор экспертной панели.", temperature)
         val finalAnswer = synthesisResponse.content.firstOrNull { it.type == "text" }?.text ?: "Нет финального ответа"
 
         val fullResponse = buildString {

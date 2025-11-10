@@ -15,6 +15,7 @@ data class ReasoningChatRequest(
     val message: String,
     val sessionId: String,
     val reasoningMode: String = "direct",
+    val temperature: Double? = null,
 )
 
 @Serializable
@@ -73,7 +74,8 @@ data class AnthropicRequest(
     val max_tokens: Int,
     val messages: List<Message>,
     val tools: List<Tool>? = null,
-    val system: String? = null
+    val system: String? = null,
+    val temperature: Double? = null,
 )
 
 @Serializable
