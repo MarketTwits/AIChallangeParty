@@ -3,8 +3,8 @@ package com.markettwits.aichallenge
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
-import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.plugins.*
+import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
@@ -38,13 +38,19 @@ class AnthropicClient(private val apiKey: String) {
     private val apiUrl = "https://api.anthropic.com/v1/messages"
     private val model = "claude-haiku-4-5-20251001"
 
-    suspend fun sendMessage(messages: List<Message>, tools: List<Tool>? = null, systemPrompt: String? = null): AnthropicResponse {
+    suspend fun sendMessage(
+        messages: List<Message>,
+        tools: List<Tool>? = null,
+        systemPrompt: String? = null,
+        temperature: Double? = null,
+    ): AnthropicResponse {
         val request = AnthropicRequest(
             model = model,
             max_tokens = 4096,
             messages = messages,
             tools = tools,
-            system = systemPrompt
+            system = systemPrompt,
+            temperature = temperature
         )
 
         logger.info("Sending request to Anthropic API with model: $model")

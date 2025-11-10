@@ -94,7 +94,8 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String)
                     ReasoningAgent(AnthropicClient(apiKey))
                 }
 
-                val response = agent.chat(request.message, request.sessionId, request.reasoningMode)
+                val response =
+                    agent.chat(request.message, request.sessionId, request.reasoningMode, request.temperature)
 
                 call.respond(response)
             } catch (e: Exception) {
