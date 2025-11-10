@@ -696,6 +696,50 @@ document.addEventListener('DOMContentLoaded', initReasoningTab);
 
 function initReasoningChat() {
     const reasoningModeBtns = document.querySelectorAll('.reasoning-mode-btn');
+    const temperatureSlider = document.getElementById('temperature-slider');
+    const temperatureValue = document.getElementById('temperature-value');
+    const clearReasoningBtn = document.getElementById('clear-reasoning-btn');
+
+    let currentTemperature = 1.0;
+
+    if (temperatureSlider && temperatureValue) {
+        temperatureSlider.addEventListener('input', (e) => {
+            currentTemperature = parseFloat(e.target.value);
+            temperatureValue.textContent = currentTemperature.toFixed(1);
+        });
+    }
+
+    if (clearReasoningBtn) {
+        clearReasoningBtn.addEventListener('click', async () => {
+            const confirmed = confirm('Вы уверены, что хотите очистить диалог?');
+            if (!confirmed) return;
+
+            try {
+                await fetch('/reasoning-chat/clear', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        sessionId: reasoningSessionIds[currentReasoningMode]
+                    })
+                });
+
+                const reasoningMessagesContainer = document.getElementById('reasoning-messages');
+                while (reasoningMessagesContainer.children.length > 1) {
+                    reasoningMessagesContainer.removeChild(reasoningMessagesContainer.lastChild);
+                }
+
+                reasoningMessageHistory[currentReasoningMode] = [];
+
+                alert('Диалог успешно очищен!');
+            } catch (error) {
+                console.error('Error clearing reasoning chat:', error);
+                alert('Ошибка при очистке диалога');
+            }
+        });
+    }
+
     reasoningModeBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             reasoningModeBtns.forEach(b => b.classList.remove('active'));
@@ -785,16 +829,22 @@ function initReasoningChat() {
         reasoningLoadingIndicator.classList.remove('hidden');
 
         try {
+            const requestBody = {
+                message: message,
+                sessionId: reasoningSessionIds[currentReasoningMode],
+                reasoningMode: currentReasoningMode
+            };
+
+            if (currentReasoningMode === 'direct') {
+                requestBody.temperature = currentTemperature;
+            }
+
             const response = await fetch('/reasoning-chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    message: message,
-                    sessionId: reasoningSessionIds[currentReasoningMode],
-                    reasoningMode: currentReasoningMode
-                })
+                body: JSON.stringify(requestBody)
             });
 
             const data = await response.json();
