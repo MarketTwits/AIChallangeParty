@@ -36,7 +36,7 @@ class AnthropicClient(private val apiKey: String) {
     }
 
     private val apiUrl = "https://api.anthropic.com/v1/messages"
-    private val model = "claude-haiku-4-5-20251001"
+    private val model = "claude-3-5-haiku-20241022"
 
     suspend fun sendMessage(
         messages: List<Message>,

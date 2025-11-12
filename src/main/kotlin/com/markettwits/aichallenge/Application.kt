@@ -18,10 +18,12 @@ fun main() {
     }
 
     val apiKey = dotenv["ANTHROPIC_API_KEY"]
-        ?: throw IllegalStateException("ANTHROPIC_API_KEY not found in .env file")
+        ?: System.getenv("ANTHROPIC_API_KEY")
+        ?: throw IllegalStateException("ANTHROPIC_API_KEY not found in .env file or environment variables")
 
     val huggingFaceKey = dotenv["HUGGINGFACE_API_KEY"]
-        ?: throw IllegalStateException("HUGGINGFACE_API_KEY not found in .env file")
+        ?: System.getenv("HUGGINGFACE_API_KEY")
+        ?: throw IllegalStateException("HUGGINGFACE_API_KEY not found in .env file or environment variables")
 
     println("Loaded API Keys:")
     println("  ANTHROPIC_API_KEY: ${apiKey.take(10)}... (length: ${apiKey.length})")

@@ -41,13 +41,21 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String,
                     AnthropicClient(apiKey)
                 }
 
-                val (response, structuredResponse) = agent.chat(request.message, request.coachStyle ?: "default")
+                val (response, structuredResponse, usage) = agent.chat(
+                    request.message,
+                    request.coachStyle ?: "default",
+                    request.maxContextTokens
+                )
                 val remainingMessages = agent.getRemainingMessages()
 
                 call.respond(ChatResponse(
                     response = response,
                     remainingMessages = remainingMessages,
-                    structuredResponse = structuredResponse
+                    structuredResponse = structuredResponse,
+                    inputTokens = usage?.input_tokens,
+                    outputTokens = usage?.output_tokens,
+                    totalInputTokens = agent.getTotalInputTokens(),
+                    contextLimit = agent.getContextLimit()
                 ))
             } catch (e: Exception) {
                 logger.error("Error processing chat request", e)
@@ -108,7 +116,13 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String,
                 }
 
                 val response =
-                    agent.chat(request.message, request.sessionId, request.reasoningMode, request.temperature)
+                    agent.chat(
+                        request.message,
+                        request.sessionId,
+                        request.reasoningMode,
+                        request.temperature,
+                        request.maxContextTokens
+                    )
 
                 call.respond(response)
             } catch (e: Exception) {
