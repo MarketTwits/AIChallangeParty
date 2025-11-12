@@ -8,23 +8,35 @@ class ReasoningAgent(private val client: AnthropicClient) {
     private val logger = LoggerFactory.getLogger(ReasoningAgent::class.java)
     private val conversationHistory = mutableMapOf<String, MutableList<Message>>()
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val maxContextTokens = mutableMapOf<String, Int?>()
+    private val totalInputTokens = mutableMapOf<String, Int>()
 
     suspend fun chat(
         userMessage: String,
         sessionId: String,
         reasoningMode: String,
         temperature: Double? = null,
+        contextLimit: Int? = null,
     ): ReasoningChatResponse {
-        logger.info("Received message in reasoning mode: $reasoningMode, temperature: $temperature")
+        logger.info("Received message in reasoning mode: $reasoningMode, temperature: $temperature, contextLimit: $contextLimit")
+
+        if (contextLimit != null && maxContextTokens[sessionId] == null) {
+            maxContextTokens[sessionId] = contextLimit
+            logger.info("Context limit set to $contextLimit tokens for session $sessionId")
+        }
+
+        totalInputTokens.getOrDefault(sessionId, 0)
+        maxContextTokens[sessionId]
 
         val history = conversationHistory.getOrPut(sessionId) { mutableListOf() }
 
         val response = when (reasoningMode) {
-            "direct" -> directResponse(userMessage, history, temperature)
-            "stepByStep" -> stepByStepResponse(userMessage, history, temperature)
-            "aiPrompt" -> aiPromptResponse(userMessage, history, temperature)
-            "experts" -> expertsResponse(userMessage, history, temperature)
-            else -> directResponse(userMessage, history, temperature)
+            "direct" -> directResponse(userMessage, history, temperature, sessionId)
+            "stepByStep" -> stepByStepResponse(userMessage, history, temperature, sessionId)
+            "aiPrompt" -> aiPromptResponse(userMessage, history, temperature, sessionId)
+            "experts" -> expertsResponse(userMessage, history, temperature, sessionId)
+            "tokenizer" -> tokenizerResponse(userMessage, history, temperature, sessionId)
+            else -> directResponse(userMessage, history, temperature, sessionId)
         }
 
         return response
@@ -34,6 +46,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
         userMessage: String,
         history: MutableList<Message>,
         temperature: Double? = null,
+        sessionId: String,
     ): ReasoningChatResponse {
         logger.info("Using direct response mode with temperature: $temperature")
 
@@ -48,6 +61,8 @@ class ReasoningAgent(private val client: AnthropicClient) {
 
         val response = client.sendMessage(history, emptyList(), systemPrompt, temperature)
 
+        totalInputTokens[sessionId] = totalInputTokens.getOrDefault(sessionId, 0) + response.usage.input_tokens
+
         val textResponse = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет ответа"
 
         history.add(
@@ -60,7 +75,11 @@ class ReasoningAgent(private val client: AnthropicClient) {
         return ReasoningChatResponse(
             response = textResponse,
             reasoningMode = "direct",
-            timestamp = Instant.now().toString()
+            timestamp = Instant.now().toString(),
+            inputTokens = response.usage.input_tokens,
+            outputTokens = response.usage.output_tokens,
+            totalInputTokens = totalInputTokens[sessionId],
+            contextLimit = maxContextTokens[sessionId]
         )
     }
 
@@ -68,6 +87,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
         userMessage: String,
         history: MutableList<Message>,
         temperature: Double? = null,
+        sessionId: String,
     ): ReasoningChatResponse {
         logger.info("Using step-by-step response mode with temperature: $temperature")
 
@@ -115,6 +135,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
         userMessage: String,
         history: MutableList<Message>,
         temperature: Double? = null,
+        sessionId: String,
     ): ReasoningChatResponse {
         logger.info("Using AI prompt generation mode with temperature: $temperature")
 
@@ -180,6 +201,7 @@ class ReasoningAgent(private val client: AnthropicClient) {
         userMessage: String,
         history: MutableList<Message>,
         temperature: Double? = null,
+        sessionId: String,
     ): ReasoningChatResponse {
         logger.info("Using experts panel mode with temperature: $temperature")
 
@@ -274,7 +296,75 @@ class ReasoningAgent(private val client: AnthropicClient) {
         )
     }
 
+    private suspend fun tokenizerResponse(
+        userMessage: String,
+        history: MutableList<Message>,
+        temperature: Double? = null,
+        sessionId: String,
+    ): ReasoningChatResponse {
+        logger.info("Using tokenizer mode")
+
+        history.add(
+            Message(
+                role = "user",
+                content = listOf(ContentBlock(type = "text", text = userMessage))
+            )
+        )
+
+        val systemPrompt = """
+            Ты - AI ассистент с функцией подсчета токенов.
+
+            ВАЖНО: После ответа на вопрос пользователя, ты ВСЕГДА должен добавить информацию о токенах:
+            - Количество входных токенов (input tokens)
+            - Количество выходных токенов (output tokens)
+            - Общее количество токенов за этот диалог
+
+            Отвечай на вопрос кратко и по существу, а затем добавь статистику токенов.
+        """.trimIndent()
+
+        val response = client.sendMessage(history, emptyList(), systemPrompt, temperature)
+
+        totalInputTokens[sessionId] = totalInputTokens.getOrDefault(sessionId, 0) + response.usage.input_tokens
+
+        val textResponse = response.content.firstOrNull { it.type == "text" }?.text ?: "Нет ответа"
+
+        val tokenizerInfo = buildString {
+            appendLine()
+            appendLine("---")
+            appendLine("📊 **Статистика токенов:**")
+            appendLine("- Входные токены: ${response.usage.input_tokens}")
+            appendLine("- Выходные токены: ${response.usage.output_tokens}")
+            appendLine("- Всего токенов в запросе: ${response.usage.input_tokens + response.usage.output_tokens}")
+            appendLine("- Общий контекст диалога: ${totalInputTokens[sessionId]} токенов")
+            if (maxContextTokens[sessionId] != null) {
+                val percentage = (totalInputTokens[sessionId]!! * 100.0 / maxContextTokens[sessionId]!!).toInt()
+                appendLine("- Использовано лимита: $percentage% (${totalInputTokens[sessionId]}/${maxContextTokens[sessionId]})")
+            }
+        }
+
+        val fullResponse = textResponse + tokenizerInfo
+
+        history.add(
+            Message(
+                role = "assistant",
+                content = listOf(ContentBlock(type = "text", text = fullResponse))
+            )
+        )
+
+        return ReasoningChatResponse(
+            response = fullResponse,
+            reasoningMode = "tokenizer",
+            timestamp = Instant.now().toString(),
+            inputTokens = response.usage.input_tokens,
+            outputTokens = response.usage.output_tokens,
+            totalInputTokens = totalInputTokens[sessionId],
+            contextLimit = maxContextTokens[sessionId]
+        )
+    }
+
     fun clearHistory(sessionId: String) {
         conversationHistory.remove(sessionId)
+        totalInputTokens.remove(sessionId)
+        maxContextTokens.remove(sessionId)
     }
 }

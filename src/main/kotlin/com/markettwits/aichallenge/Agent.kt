@@ -10,6 +10,8 @@ class Agent(private val client: AnthropicClient) {
     private val maxIterations = 5
     private val messageLimit = 10
     private var messageCount = 0
+    private var maxContextTokens: Int? = null
+    private var totalInputTokens = 0
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 
     private fun getCommonPrompt(): String = """
@@ -157,13 +159,28 @@ class Agent(private val client: AnthropicClient) {
         """.trimIndent()
     }
 
-    suspend fun chat(userMessage: String, coachStyle: String = "default"): Pair<String, StructuredLLMResponse?> {
+    suspend fun chat(
+        userMessage: String,
+        coachStyle: String = "default",
+        contextLimit: Int? = null,
+    ): Triple<String, StructuredLLMResponse?, Usage?> {
         logger.info("Received user message: $userMessage")
+
+        if (contextLimit != null && maxContextTokens == null) {
+            maxContextTokens = contextLimit
+            logger.info("Context limit set to $maxContextTokens tokens")
+        }
 
         messageCount++
         if (messageCount > messageLimit) {
             logger.info("Message limit exceeded: $messageCount/$messageLimit")
-            return "LIMIT_EXCEEDED" to null
+            return Triple("LIMIT_EXCEEDED", null, null)
+        }
+
+        val currentLimit = maxContextTokens
+        if (currentLimit != null && totalInputTokens >= currentLimit) {
+            logger.warn("Context token limit exceeded: $totalInputTokens/$currentLimit")
+            return Triple("CONTEXT_LIMIT_EXCEEDED", null, Usage(totalInputTokens, 0))
         }
 
         conversationHistory.add(
@@ -176,6 +193,7 @@ class Agent(private val client: AnthropicClient) {
         var iterations = 0
         var finalResponse = ""
         var lastTextResponse = ""
+        var lastUsage: Usage? = null
 
         while (iterations < maxIterations) {
             iterations++
@@ -195,13 +213,17 @@ class Agent(private val client: AnthropicClient) {
                         }
                     }}"
                 }}")
-                return "Ошибка валидации истории диалога: $validationError" to null
+                return Triple("Ошибка валидации истории диалога: $validationError", null, null)
             }
 
             logger.info("Sending request with ${conversationHistory.size} messages in history")
 
             val response = try {
-                client.sendMessage(conversationHistory, tools, getSystemPrompt(coachStyle))
+                val apiResponse = client.sendMessage(conversationHistory, tools, getSystemPrompt(coachStyle))
+                lastUsage = apiResponse.usage
+                totalInputTokens += apiResponse.usage.input_tokens
+                logger.info("Total input tokens so far: $totalInputTokens" + if (maxContextTokens != null) " / $maxContextTokens" else "")
+                apiResponse
             } catch (e: Exception) {
                 logger.error("Error calling Claude API", e)
                 logger.error("Conversation history at error: ${conversationHistory.mapIndexed { idx, msg ->
@@ -214,7 +236,7 @@ class Agent(private val client: AnthropicClient) {
                         }
                     }}"
                 }}")
-                return "Извините, произошла ошибка при обращении к API: ${e.message}" to null
+                return Triple("Извините, произошла ошибка при обращении к API: ${e.message}", null, null)
             }
 
             val assistantContent = mutableListOf<ContentBlock>()
@@ -313,7 +335,7 @@ class Agent(private val client: AnthropicClient) {
             null
         }
 
-        return finalResponse to structuredResponse
+        return Triple(finalResponse, structuredResponse, lastUsage)
     }
 
     private fun validateConversationHistory(): String? {
@@ -368,9 +390,15 @@ class Agent(private val client: AnthropicClient) {
     fun clearHistory() {
         conversationHistory.clear()
         messageCount = 0
+        totalInputTokens = 0
+        maxContextTokens = null
     }
 
     fun getMessageCount(): Int = messageCount
 
     fun getRemainingMessages(): Int = messageLimit - messageCount
+
+    fun getTotalInputTokens(): Int = totalInputTokens
+
+    fun getContextLimit(): Int? = maxContextTokens
 }
