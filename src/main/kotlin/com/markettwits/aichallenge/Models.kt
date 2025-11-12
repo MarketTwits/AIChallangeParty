@@ -7,7 +7,8 @@ import kotlinx.serialization.json.JsonObject
 data class ChatRequest(
     val message: String,
     val sessionId: String,
-    val coachStyle: String? = "default"
+    val coachStyle: String? = "default",
+    val maxContextTokens: Int? = null,
 )
 
 @Serializable
@@ -16,6 +17,7 @@ data class ReasoningChatRequest(
     val sessionId: String,
     val reasoningMode: String = "direct",
     val temperature: Double? = null,
+    val maxContextTokens: Int? = null,
 )
 
 @Serializable
@@ -24,6 +26,10 @@ data class ReasoningChatResponse(
     val reasoningMode: String,
     val timestamp: String,
     val experts: List<ExpertOpinion>? = null,
+    val inputTokens: Int? = null,
+    val outputTokens: Int? = null,
+    val totalInputTokens: Int? = null,
+    val contextLimit: Int? = null,
 )
 
 @Serializable
@@ -37,7 +43,11 @@ data class ExpertOpinion(
 data class ChatResponse(
     val response: String,
     val remainingMessages: Int? = null,
-    val structuredResponse: StructuredLLMResponse? = null
+    val structuredResponse: StructuredLLMResponse? = null,
+    val inputTokens: Int? = null,
+    val outputTokens: Int? = null,
+    val totalInputTokens: Int? = null,
+    val contextLimit: Int? = null,
 )
 
 @Serializable

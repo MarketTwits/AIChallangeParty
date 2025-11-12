@@ -10,9 +10,16 @@ const messageCounterEl = document.getElementById('message-counter');
 const chatContainer = document.getElementById('chat-container');
 const chatBackdrop = document.getElementById('chat-backdrop');
 const expandIndicator = document.querySelector('.expand-indicator');
+const contextLimitSlider = document.getElementById('context-limit-slider');
+const contextLimitValue = document.getElementById('context-limit-value');
+const contextProgress = document.getElementById('context-progress');
+const contextUsed = document.getElementById('context-used');
+const contextMax = document.getElementById('context-max');
+const contextBar = document.getElementById('context-bar');
 
 let remainingMessages = 10;
 let currentCoachStyle = 'default';
+let maxContextTokens = null;
 
 function loadCoachStyle() {
     const saved = localStorage.getItem('coachStyle');
@@ -53,6 +60,41 @@ function setCoachStyle(style) {
 }
 
 loadCoachStyle();
+
+contextLimitSlider.addEventListener('input', (e) => {
+    const value = parseInt(e.target.value);
+    if (value === 0) {
+        contextLimitValue.textContent = 'Без лимита';
+        maxContextTokens = null;
+        contextProgress.classList.add('hidden');
+    } else {
+        contextLimitValue.textContent = value;
+        maxContextTokens = value;
+        contextProgress.classList.remove('hidden');
+        contextMax.textContent = value;
+    }
+});
+
+function updateContextProgress(totalInputTokens, contextLimit) {
+    if (contextLimit && contextLimit > 0) {
+        contextProgress.classList.remove('hidden');
+        contextUsed.textContent = totalInputTokens;
+        contextMax.textContent = contextLimit;
+        const percentage = Math.min((totalInputTokens / contextLimit) * 100, 100);
+        contextBar.style.width = percentage + '%';
+
+        if (percentage >= 90) {
+            contextBar.classList.remove('bg-blue-500');
+            contextBar.classList.add('bg-red-500');
+        } else if (percentage >= 70) {
+            contextBar.classList.remove('bg-blue-500', 'bg-red-500');
+            contextBar.classList.add('bg-orange-500');
+        } else {
+            contextBar.classList.remove('bg-orange-500', 'bg-red-500');
+            contextBar.classList.add('bg-blue-500');
+        }
+    }
+}
 
 function getOrCreateSessionId() {
     let sessionId = sessionStorage.getItem('sessionId');
@@ -144,7 +186,8 @@ chatForm.addEventListener('submit', async (e) => {
             body: JSON.stringify({
                 message,
                 sessionId,
-                coachStyle: currentCoachStyle
+                coachStyle: currentCoachStyle,
+                maxContextTokens: maxContextTokens
             })
         });
 
@@ -161,11 +204,21 @@ chatForm.addEventListener('submit', async (e) => {
             return;
         }
 
-        addMessage('assistant', data.response, data.structuredResponse);
+        if (data.response === 'CONTEXT_LIMIT_EXCEEDED') {
+            addMessage('assistant', `⚠️ Достигнут лимит контекста в ${data.totalInputTokens} токенов! Начните новый диалог или увеличьте лимит.`);
+            userInput.disabled = true;
+            return;
+        }
+
+        addMessage('assistant', data.response, data.structuredResponse, data.inputTokens, data.outputTokens);
 
         if (data.remainingMessages !== undefined && data.remainingMessages !== null) {
             remainingMessages = data.remainingMessages;
             updateMessageCounter();
+        }
+
+        if (data.totalInputTokens !== undefined && data.contextLimit !== undefined) {
+            updateContextProgress(data.totalInputTokens, data.contextLimit);
         }
 
         if (remainingMessages <= 0) {
@@ -225,7 +278,7 @@ function showLimitModal() {
     limitModal.classList.remove('hidden');
 }
 
-function addMessage(role, content, structuredResponse = null) {
+function addMessage(role, content, structuredResponse = null, inputTokens = null, outputTokens = null) {
     const messageWrapper = document.createElement('div');
     messageWrapper.className = `message ${role === 'user' ? 'flex justify-end' : ''}`;
 
@@ -268,6 +321,31 @@ function addMessage(role, content, structuredResponse = null) {
                 markdownDiv.innerHTML = marked.parse(content);
                 messageDiv.appendChild(markdownDiv);
             }
+        }
+
+        if (inputTokens !== null && outputTokens !== null) {
+            const tokenInfo = document.createElement('div');
+            tokenInfo.className = 'mt-3 pt-3 border-t border-gray-200 flex items-center gap-4 text-xs text-gray-500';
+            const totalTokens = inputTokens + outputTokens;
+            const costPer1M = 0.80;
+            const cost = ((inputTokens / 1000000) * costPer1M + (outputTokens / 1000000) * (costPer1M * 5)).toFixed(6);
+            tokenInfo.innerHTML = `
+                <span class="flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                    </svg>
+                    Вход: <strong>${inputTokens}</strong>
+                </span>
+                <span class="flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                    </svg>
+                    Выход: <strong>${outputTokens}</strong>
+                </span>
+                <span>Всего: <strong>${totalTokens}</strong></span>
+                <span>Стоимость: <strong>$${cost}</strong></span>
+            `;
+            messageDiv.appendChild(tokenInfo);
         }
 
         contentWrapper.appendChild(label);
@@ -633,14 +711,16 @@ let reasoningSessionIds = {
     direct: 'reasoning_direct_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
     stepByStep: 'reasoning_step_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
     aiPrompt: 'reasoning_prompt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
-    experts: 'reasoning_experts_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+    experts: 'reasoning_experts_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+    tokenizer: 'reasoning_tokenizer_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9)
 };
 
 let reasoningMessageHistory = {
     direct: [],
     stepByStep: [],
     aiPrompt: [],
-    experts: []
+    experts: [],
+    tokenizer: []
 };
 
 function initReasoningTab() {
@@ -772,13 +852,56 @@ function initReasoningChat() {
     const reasoningInput = document.getElementById('reasoning-input');
     const reasoningMessagesContainer = document.getElementById('reasoning-messages');
     const reasoningLoadingIndicator = document.getElementById('reasoning-loading');
+    const reasoningContextLimitSlider = document.getElementById('reasoning-context-limit-slider');
+    const reasoningContextLimitValue = document.getElementById('reasoning-context-limit-value');
+    const reasoningContextProgress = document.getElementById('reasoning-context-progress');
+    const reasoningContextUsed = document.getElementById('reasoning-context-used');
+    const reasoningContextMax = document.getElementById('reasoning-context-max');
+    const reasoningContextBar = document.getElementById('reasoning-context-bar');
 
     if (!reasoningForm || !reasoningInput || !reasoningMessagesContainer || !reasoningLoadingIndicator) {
         console.error('Reasoning chat elements not found');
         return;
     }
 
-    function addReasoningMessage(role, content, saveToHistory = true) {
+    let reasoningMaxContextTokens = null;
+
+    reasoningContextLimitSlider.addEventListener('input', (e) => {
+        const value = parseInt(e.target.value);
+        if (value === 0) {
+            reasoningContextLimitValue.textContent = 'Без лимита';
+            reasoningMaxContextTokens = null;
+            reasoningContextProgress.classList.add('hidden');
+        } else {
+            reasoningContextLimitValue.textContent = value;
+            reasoningMaxContextTokens = value;
+            reasoningContextProgress.classList.remove('hidden');
+            reasoningContextMax.textContent = value;
+        }
+    });
+
+    function updateReasoningContextProgress(totalInputTokens, contextLimit) {
+        if (contextLimit && contextLimit > 0) {
+            reasoningContextProgress.classList.remove('hidden');
+            reasoningContextUsed.textContent = totalInputTokens;
+            reasoningContextMax.textContent = contextLimit;
+            const percentage = Math.min((totalInputTokens / contextLimit) * 100, 100);
+            reasoningContextBar.style.width = percentage + '%';
+
+            if (percentage >= 90) {
+                reasoningContextBar.classList.remove('bg-blue-500');
+                reasoningContextBar.classList.add('bg-red-500');
+            } else if (percentage >= 70) {
+                reasoningContextBar.classList.remove('bg-blue-500', 'bg-red-500');
+                reasoningContextBar.classList.add('bg-orange-500');
+            } else {
+                reasoningContextBar.classList.remove('bg-orange-500', 'bg-red-500');
+                reasoningContextBar.classList.add('bg-blue-500');
+            }
+        }
+    }
+
+    function addReasoningMessage(role, content, saveToHistory = true, inputTokens = null, outputTokens = null) {
         const messageEl = document.createElement('div');
         messageEl.className = 'flex items-start space-x-4 message';
 
@@ -794,6 +917,32 @@ function initReasoningChat() {
             `;
         } else {
             const formattedContent = typeof marked !== 'undefined' ? marked.parse(content) : content.replace(/\n/g, '<br>');
+
+            let tokenInfoHtml = '';
+            if (inputTokens !== null && outputTokens !== null) {
+                const totalTokens = inputTokens + outputTokens;
+                const costPer1M = 0.80;
+                const cost = ((inputTokens / 1000000) * costPer1M + (outputTokens / 1000000) * (costPer1M * 5)).toFixed(6);
+                tokenInfoHtml = `
+                    <div class="mt-3 pt-3 border-t border-gray-200 flex items-center gap-4 text-xs text-gray-500">
+                        <span class="flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                            </svg>
+                            Вход: <strong>${inputTokens}</strong>
+                        </span>
+                        <span class="flex items-center gap-1">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                            </svg>
+                            Выход: <strong>${outputTokens}</strong>
+                        </span>
+                        <span>Всего: <strong>${totalTokens}</strong></span>
+                        <span>Стоимость: <strong>$${cost}</strong></span>
+                    </div>
+                `;
+            }
+
             messageEl.innerHTML = `
                 <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
                     AI
@@ -802,6 +951,7 @@ function initReasoningChat() {
                     <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">AI Ассистент</p>
                     <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
                         <div class="markdown-content text-gray-700 leading-relaxed">${formattedContent}</div>
+                        ${tokenInfoHtml}
                     </div>
                 </div>
             `;
@@ -847,7 +997,8 @@ function initReasoningChat() {
             const requestBody = {
                 message: message,
                 sessionId: reasoningSessionIds[currentReasoningMode],
-                reasoningMode: currentReasoningMode
+                reasoningMode: currentReasoningMode,
+                maxContextTokens: reasoningMaxContextTokens
             };
 
             if (currentReasoningMode === 'direct') {
@@ -865,7 +1016,11 @@ function initReasoningChat() {
             const data = await response.json();
             reasoningLoadingIndicator.classList.add('hidden');
 
-            addReasoningMessage('assistant', data.response);
+            addReasoningMessage('assistant', data.response, true, data.inputTokens, data.outputTokens);
+
+            if (data.totalInputTokens !== undefined && data.contextLimit !== undefined) {
+                updateReasoningContextProgress(data.totalInputTokens, data.contextLimit);
+            }
         } catch (error) {
             reasoningLoadingIndicator.classList.add('hidden');
             addReasoningMessage('assistant', 'Произошла ошибка при обработке запроса');

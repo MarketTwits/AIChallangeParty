@@ -626,6 +626,36 @@
                         </div>
 
                         <div class="mt-4 p-4 rounded-xl border border-gray-200" style="background: white;">
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                🎯 Лимит контекста (токены): <span id="context-limit-value">Без лимита</span>
+                            </label>
+                            <input
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mb-2"
+                                    id="context-limit-slider"
+                                    max="5000"
+                                    min="0"
+                                    step="100"
+                                    type="range"
+                                    value="0"
+                            />
+                            <div class="flex justify-between text-xs text-gray-500 mb-4">
+                                <span>0 - Без лимита</span>
+                                <span>5000 - Максимальный лимит</span>
+                            </div>
+                            <div class="hidden mb-4" id="context-progress">
+                                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span>Использовано токенов контекста:</span>
+                                    <span><strong id="context-used">0</strong> / <strong
+                                            id="context-max">∞</strong></span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full transition-all" id="context-bar"
+                                         style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mt-4 p-4 rounded-xl border border-gray-200" style="background: white;">
                             <label class="block text-sm font-semibold text-gray-700 mb-3">Стиль тренера:</label>
                             <div class="grid grid-cols-2 gap-2">
                                 <button type="button" class="coach-style-btn active" data-style="default">
@@ -745,7 +775,7 @@
                     <div class="mb-6">
                         <label class="block text-sm font-semibold text-gray-700 mb-3">Выберите способ
                             рассуждения:</label>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                             <button class="reasoning-mode-btn active" data-mode="direct">
                                 <span class="text-lg">⚡</span>
                                 <span class="text-xs">Прямой ответ</span>
@@ -762,6 +792,41 @@
                                 <span class="text-lg">👥</span>
                                 <span class="text-xs">Эксперты</span>
                             </button>
+                            <button class="reasoning-mode-btn" data-mode="tokenizer">
+                                <span class="text-lg">🔢</span>
+                                <span class="text-xs">Токенизатор</span>
+                            </button>
+                        </div>
+
+                        <div class="mt-4 p-4 rounded-xl border border-gray-200" id="reasoning-context-limit-control"
+                             style="background: white;">
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                🎯 Лимит контекста (токены): <span id="reasoning-context-limit-value">Без лимита</span>
+                            </label>
+                            <input
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer mb-2"
+                                    id="reasoning-context-limit-slider"
+                                    max="5000"
+                                    min="0"
+                                    step="100"
+                                    type="range"
+                                    value="0"
+                            />
+                            <div class="flex justify-between text-xs text-gray-500 mb-4">
+                                <span>0 - Без лимита</span>
+                                <span>5000 - Максимальный лимит</span>
+                            </div>
+                            <div class="hidden mb-4" id="reasoning-context-progress">
+                                <div class="flex justify-between text-xs text-gray-600 mb-1">
+                                    <span>Использовано токенов контекста:</span>
+                                    <span><strong id="reasoning-context-used">0</strong> / <strong
+                                            id="reasoning-context-max">∞</strong></span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2">
+                                    <div class="bg-blue-500 h-2 rounded-full transition-all" id="reasoning-context-bar"
+                                         style="width: 0%"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="mt-4 p-4 rounded-xl border border-gray-200" id="temperature-control"
