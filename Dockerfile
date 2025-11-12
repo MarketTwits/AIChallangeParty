@@ -18,6 +18,4 @@ COPY --from=build /app/build/libs/*-all.jar app.jar
 
 EXPOSE 8080
 
-ENV ANTHROPIC_API_KEY=""
-
 CMD ["java", "-jar", "app.jar"]
