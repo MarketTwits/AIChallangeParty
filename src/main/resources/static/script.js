@@ -647,35 +647,46 @@ function initReasoningTab() {
     console.log('Initializing reasoning tab...');
     const tabTraining = document.getElementById('tab-training');
     const tabReasoning = document.getElementById('tab-reasoning');
+    const tabModels = document.getElementById('tab-models');
     const trainingContent = document.getElementById('training-content');
     const reasoningContent = document.getElementById('reasoning-content');
+    const modelsContent = document.getElementById('models-content');
 
     console.log('Elements:', {
         tabTraining: !!tabTraining,
         tabReasoning: !!tabReasoning,
+        tabModels: !!tabModels,
         trainingContent: !!trainingContent,
-        reasoningContent: !!reasoningContent
+        reasoningContent: !!reasoningContent,
+        modelsContent: !!modelsContent
     });
 
-    if (!tabTraining || !tabReasoning || !trainingContent || !reasoningContent) {
+    if (!tabTraining || !tabReasoning || !tabModels || !trainingContent || !reasoningContent || !modelsContent) {
         console.error('Tab elements not found!', {
-            tabTraining, tabReasoning, trainingContent, reasoningContent
+            tabTraining, tabReasoning, tabModels, trainingContent, reasoningContent, modelsContent
         });
         return;
     }
 
     function switchTab(tab) {
         console.log('Switching to tab:', tab);
+
+        tabTraining.classList.remove('active-tab');
+        tabReasoning.classList.remove('active-tab');
+        tabModels.classList.remove('active-tab');
+        trainingContent.classList.remove('active');
+        reasoningContent.classList.remove('active');
+        modelsContent.classList.remove('active');
+
         if (tab === 'training') {
             tabTraining.classList.add('active-tab');
-            tabReasoning.classList.remove('active-tab');
             trainingContent.classList.add('active');
-            reasoningContent.classList.remove('active');
-        } else {
+        } else if (tab === 'reasoning') {
             tabReasoning.classList.add('active-tab');
-            tabTraining.classList.remove('active-tab');
             reasoningContent.classList.add('active');
-            trainingContent.classList.remove('active');
+        } else if (tab === 'models') {
+            tabModels.classList.add('active-tab');
+            modelsContent.classList.add('active');
         }
         console.log('Tab switched successfully');
     }
@@ -687,6 +698,10 @@ function initReasoningTab() {
     tabReasoning.addEventListener('click', () => {
         console.log('Reasoning tab clicked');
         switchTab('reasoning');
+    });
+    tabModels.addEventListener('click', () => {
+        console.log('Models tab clicked');
+        switchTab('models');
     });
 
     console.log('Event listeners attached successfully');
@@ -860,3 +875,142 @@ function initReasoningChat() {
 }
 
 document.addEventListener('DOMContentLoaded', initReasoningChat);
+
+if (document.getElementById('tab-models')) {
+    const tabModels = document.getElementById('tab-models');
+    const modelsContent = document.getElementById('models-content');
+    const comparisonForm = document.getElementById('comparison-form');
+    const comparisonInput = document.getElementById('comparison-input');
+    const comparisonResults = document.getElementById('comparison-results');
+    const comparisonLoading = document.getElementById('comparison-loading');
+    const comparisonQuickPrompts = document.querySelectorAll('#models-content .quick-prompt');
+
+    function escapeHtmlComparison(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    comparisonQuickPrompts.forEach(button => {
+        button.addEventListener('click', () => {
+            const promptText = button.textContent.trim().substring(2);
+            comparisonInput.value = promptText;
+        });
+    });
+
+    function displayComparisonResults(data) {
+        comparisonResults.innerHTML = '';
+
+        const summaryDiv = document.createElement('div');
+        summaryDiv.className = 'bg-gray-50 rounded-xl p-4 border border-gray-200 mb-4';
+        summaryDiv.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="font-bold text-lg" style="color: var(--primary-color);">📊 Результаты сравнения</h3>
+                <span class="text-sm text-gray-600">Общее время: ${data.totalTimeMs}ms</span>
+            </div>
+        `;
+        comparisonResults.appendChild(summaryDiv);
+
+        data.results.forEach((result, index) => {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'border-2 border-gray-200 rounded-xl p-5 bg-white hover:shadow-lg transition-shadow';
+
+            let statusBadge = '';
+            if (result.error) {
+                statusBadge = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-bold">❌ Ошибка</span>';
+            } else {
+                statusBadge = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-bold">✅ Успешно</span>';
+            }
+
+            let costDisplay = result.estimatedCost > 0
+                ? `<div class="text-sm text-gray-600">💰 Стоимость: $${result.estimatedCost.toFixed(6)}</div>`
+                : '<div class="text-sm text-green-600">💚 Бесплатно</div>';
+
+            resultDiv.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-3">
+                        <h3 class="font-bold text-lg" style="color: var(--primary-color);">${result.modelName}</h3>
+                        ${statusBadge}
+                    </div>
+                </div>
+                <div class="text-xs text-gray-500 mb-3">${result.modelId}</div>
+
+                <div class="grid grid-cols-3 gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1">⏱️ Время ответа</div>
+                        <div class="font-bold text-sm">${result.responseTimeMs}ms</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1">📥 Входные токены</div>
+                        <div class="font-bold text-sm">${result.inputTokens}</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1">📤 Выходные токены</div>
+                        <div class="font-bold text-sm">${result.outputTokens}</div>
+                    </div>
+                </div>
+
+                ${costDisplay}
+
+                ${result.error ?
+                `<div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div class="font-semibold text-red-700 mb-2">Ошибка:</div>
+                        <div class="text-sm text-red-600">${escapeHtmlComparison(result.error)}</div>
+                    </div>`
+                :
+                `<div class="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div class="font-semibold mb-2" style="color: var(--primary-color);">Ответ модели:</div>
+                        <div class="markdown-content text-sm text-gray-700">${marked.parse(result.response)}</div>
+                    </div>`
+            }
+            `;
+
+            comparisonResults.appendChild(resultDiv);
+        });
+    }
+
+    comparisonForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const query = comparisonInput.value.trim();
+        if (!query) return;
+
+        comparisonResults.innerHTML = '';
+        comparisonLoading.classList.remove('hidden');
+
+        try {
+            console.log('Sending comparison request with query:', query);
+
+            const response = await fetch('/model-comparison', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({query})
+            });
+
+            console.log('Response status:', response.status);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Error response:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            const data = await response.json();
+            console.log('Comparison results:', data);
+
+            comparisonLoading.classList.add('hidden');
+            displayComparisonResults(data);
+        } catch (error) {
+            console.error('Comparison error:', error);
+            comparisonLoading.classList.add('hidden');
+            comparisonResults.innerHTML = `
+                <div class="bg-red-50 border border-red-200 rounded-xl p-4">
+                    <div class="font-semibold text-red-700 mb-2">Произошла ошибка при сравнении моделей</div>
+                    <div class="text-sm text-red-600 mb-2"><strong>Сообщение:</strong> ${escapeHtmlComparison(error.message)}</div>
+                    <div class="text-xs text-gray-600">Проверьте консоль браузера (F12) для подробностей</div>
+                </div>
+            `;
+        }
+    });
+}
