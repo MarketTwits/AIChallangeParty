@@ -475,6 +475,7 @@
                 <nav class="hidden md:flex items-center space-x-6">
                     <button class="nav-link text-sm font-medium active-tab" id="tab-training">Тренер</button>
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
+                    <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
                     <a href="https://sportsauce.ru/starts" target="_blank" class="nav-link text-sm font-medium">Старты</a>
@@ -648,6 +649,89 @@
                     </form>
                 </div>
             </div>
+            </div>
+
+            <!-- Model Comparison Tab -->
+            <div class="tab-content" id="models-content">
+                <div class="chat-container p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🔬 Сравнение моделей
+                        HuggingFace</h2>
+                    <p class="text-gray-600 mb-6">Отправьте один запрос на 3 разные модели и сравните результаты, время
+                        ответа и количество токенов</p>
+
+                    <div class="mb-6">
+                        <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                            <p class="font-semibold mb-3 text-sm" style="color: var(--primary-color);">
+                                📊 Тестируемые модели:
+                            </p>
+                            <ul class="space-y-2 text-sm text-gray-600">
+                                <li class="flex items-start">
+                                    <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                    <span><strong>Llama 3.2 3B Instruct</strong> - компактная модель от Meta (3B параметров)</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                    <span><strong>Qwen 2.5 72B Instruct</strong> - мощная модель от Alibaba (72B параметров)</span>
+                                </li>
+                                <li class="flex items-start">
+                                    <span class="mr-2" style="color: var(--primary-color);">▸</span>
+                                    <span><strong>L3 8B Lunaris v1</strong> - оптимизированная модель (8B параметров)</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="space-y-6 mb-6" id="comparison-results"></div>
+
+                    <div class="hidden mb-6" id="comparison-loading">
+                        <div class="flex items-center justify-center space-x-4 py-8">
+                            <div class="loading-dots flex space-x-2">
+                                <span class="w-3 h-3 rounded-full"></span>
+                                <span class="w-3 h-3 rounded-full"></span>
+                                <span class="w-3 h-3 rounded-full"></span>
+                            </div>
+                            <span class="text-gray-600">Отправляю запрос на все модели...</span>
+                        </div>
+                    </div>
+
+                    <div class="border-t border-gray-200 pt-6">
+                        <form class="space-y-4" id="comparison-form">
+                            <div class="flex space-x-3">
+                                <input
+                                        autocomplete="off"
+                                        class="flex-1 px-5 py-4 rounded-xl font-medium"
+                                        id="comparison-input"
+                                        placeholder="Например: Объясни квантовую механику простыми словами"
+                                        type="text"
+                                />
+                                <button
+                                        class="send-button text-white px-8 py-4 rounded-xl font-bold flex items-center justify-center space-x-2"
+                                        type="submit"
+                                >
+                                    <span>Сравнить</span>
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"
+                                              stroke-width="2.5"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" type="button">
+                                    🧠 Что такое AI?
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" type="button">
+                                    🔢 Реши: 2+2*2
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" type="button">
+                                    📝 Напиши короткое стихотворение
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" type="button">
+                                    💡 Дай совет по продуктивности
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             </div>
 
             <!-- Reasoning Chat Tab -->
