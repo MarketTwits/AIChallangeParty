@@ -14,9 +14,22 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
-fun Application.configureRouting(sessionManager: SessionManager, apiKey: String) {
+fun Application.configureRouting(sessionManager: SessionManager, apiKey: String, huggingFaceKey: String) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
+
+    val hfKeyMasked = if (huggingFaceKey.length > 8) {
+        "${huggingFaceKey.substring(0, 8)}...${huggingFaceKey.substring(huggingFaceKey.length - 4)}"
+    } else {
+        "NOT_SET"
+    }
+    logger.info("HuggingFace API Key in Routes: $hfKeyMasked (length: ${huggingFaceKey.length})")
+
+    if (huggingFaceKey.isEmpty()) {
+        logger.error("HUGGINGFACE_API_KEY is empty!")
+    }
+
+    val huggingFaceClient = HuggingFaceClient(huggingFaceKey)
 
     routing {
         post("/chat") {
@@ -115,6 +128,23 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String)
                 call.respond(HttpStatusCode.OK, mapOf("status" to "cleared"))
             } catch (e: Exception) {
                 logger.error("Error clearing reasoning chat session", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/model-comparison") {
+            try {
+                val request = call.receive<ComparisonRequest>()
+                logger.info("Received model comparison request: ${request.query}")
+
+                val response = huggingFaceClient.compareModels(request.query)
+
+                call.respond(response)
+            } catch (e: Exception) {
+                logger.error("Error processing model comparison request", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to e.message)
