@@ -18,6 +18,7 @@ data class ReasoningChatRequest(
     val reasoningMode: String = "direct",
     val temperature: Double? = null,
     val maxContextTokens: Int? = null,
+    val compressionThreshold: Int? = null,
 )
 
 @Serializable
@@ -30,6 +31,8 @@ data class ReasoningChatResponse(
     val outputTokens: Int? = null,
     val totalInputTokens: Int? = null,
     val contextLimit: Int? = null,
+    val summaries: List<DialogSummary>? = null,
+    val compressionOccurred: Boolean? = null,
 )
 
 @Serializable
@@ -118,4 +121,13 @@ data class InputSchema(
     val type: String,
     val properties: JsonObject,
     val required: List<String>
+)
+
+@Serializable
+data class DialogSummary(
+    val summary: String,
+    val originalMessageCount: Int,
+    val timestamp: String,
+    val tokensBeforeCompression: Int,
+    val tokensAfterCompression: Int,
 )

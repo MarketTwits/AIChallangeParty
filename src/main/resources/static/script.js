@@ -794,13 +794,29 @@ function initReasoningChat() {
     const temperatureSlider = document.getElementById('temperature-slider');
     const temperatureValue = document.getElementById('temperature-value');
     const clearReasoningBtn = document.getElementById('clear-reasoning-btn');
+    const compressionThresholdSlider = document.getElementById('compression-threshold-slider');
+    const compressionThresholdValue = document.getElementById('compression-threshold-value');
+    const summariesContainer = document.getElementById('summaries-container');
 
     let currentTemperature = 1.0;
+    let currentCompressionThreshold = 0;
 
     if (temperatureSlider && temperatureValue) {
         temperatureSlider.addEventListener('input', (e) => {
             currentTemperature = parseFloat(e.target.value);
             temperatureValue.textContent = currentTemperature.toFixed(1);
+        });
+    }
+
+    if (compressionThresholdSlider && compressionThresholdValue) {
+        compressionThresholdSlider.addEventListener('input', (e) => {
+            const value = parseInt(e.target.value);
+            currentCompressionThreshold = value;
+            if (value === 0) {
+                compressionThresholdValue.textContent = 'Выключена';
+            } else {
+                compressionThresholdValue.textContent = `Каждые ${value} сообщений`;
+            }
         });
     }
 
@@ -998,7 +1014,8 @@ function initReasoningChat() {
                 message: message,
                 sessionId: reasoningSessionIds[currentReasoningMode],
                 reasoningMode: currentReasoningMode,
-                maxContextTokens: reasoningMaxContextTokens
+                maxContextTokens: reasoningMaxContextTokens,
+                compressionThreshold: currentCompressionThreshold > 0 ? currentCompressionThreshold : null
             };
 
             if (currentReasoningMode === 'direct') {
@@ -1016,6 +1033,14 @@ function initReasoningChat() {
             const data = await response.json();
             reasoningLoadingIndicator.classList.add('hidden');
 
+            if (data.compressionOccurred) {
+                displayCompressionNotification();
+            }
+
+            if (data.summaries && data.summaries.length > 0) {
+                updateSummariesDisplay(data.summaries);
+            }
+
             addReasoningMessage('assistant', data.response, true, data.inputTokens, data.outputTokens);
 
             if (data.totalInputTokens !== undefined && data.contextLimit !== undefined) {
@@ -1027,6 +1052,79 @@ function initReasoningChat() {
             console.error('Error:', error);
         }
     });
+}
+
+function escapeHtmlForSummary(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function displayCompressionNotification() {
+    const reasoningMessagesContainer = document.getElementById('reasoning-messages');
+
+    const notificationEl = document.createElement('div');
+    notificationEl.className = 'p-4 bg-blue-50 border-2 border-blue-300 rounded-xl flex items-center gap-3 message animate-pulse';
+    notificationEl.innerHTML = `
+        <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <div class="flex-1">
+            <p class="font-bold text-blue-700 text-sm">🗜️ Компрессия выполнена!</p>
+            <p class="text-xs text-blue-600">История диалога была сжата для экономии токенов. Проверьте раздел "История компрессий" ниже.</p>
+        </div>
+    `;
+
+    reasoningMessagesContainer.appendChild(notificationEl);
+    reasoningMessagesContainer.scrollTop = reasoningMessagesContainer.scrollHeight;
+
+    setTimeout(() => {
+        notificationEl.classList.remove('animate-pulse');
+    }, 3000);
+}
+
+function updateSummariesDisplay(summaries) {
+    const summariesContainer = document.getElementById('summaries-container');
+    if (!summariesContainer) return;
+
+    summariesContainer.innerHTML = '<p class="text-xs font-semibold text-gray-600 mb-2">📝 История компрессий:</p>';
+
+    summaries.forEach((summary, index) => {
+        const summaryEl = document.createElement('div');
+        summaryEl.className = 'p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-all';
+
+        const tokensSaved = summary.tokensBeforeCompression - summary.tokensAfterCompression;
+        const percentage = ((tokensSaved / summary.tokensBeforeCompression) * 100).toFixed(1);
+
+        const timestamp = new Date(summary.timestamp);
+        const timeStr = timestamp.toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+
+        summaryEl.innerHTML = `
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-xs font-bold text-blue-700">Компрессия #${index + 1}</span>
+                <span class="text-xs text-gray-500">${timeStr}</span>
+            </div>
+            <div class="text-xs text-gray-600 mb-2">
+                <span class="font-semibold">Сообщений:</span> ${summary.originalMessageCount} → 1 summary
+            </div>
+            <div class="text-xs text-gray-600 mb-2">
+                <span class="font-semibold">Токены:</span> ${summary.tokensBeforeCompression} → ${summary.tokensAfterCompression}
+                <span class="text-green-600 font-bold ml-1">(сэкономлено ${percentage}%)</span>
+            </div>
+            <div class="text-xs text-gray-700 p-2 bg-white rounded border border-gray-200 mt-2 hidden summary-text">
+                ${escapeHtmlForSummary(summary.summary)}
+            </div>
+        `;
+
+        summaryEl.addEventListener('click', () => {
+            const textEl = summaryEl.querySelector('.summary-text');
+            textEl.classList.toggle('hidden');
+        });
+
+        summariesContainer.appendChild(summaryEl);
+    });
+
+    summariesContainer.classList.remove('hidden');
 }
 
 document.addEventListener('DOMContentLoaded', initReasoningChat);
