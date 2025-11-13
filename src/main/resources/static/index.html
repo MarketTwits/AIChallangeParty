@@ -849,6 +849,28 @@
                             </div>
                         </div>
 
+                        <div class="mt-4 p-4 rounded-xl border border-gray-200" style="background: white;">
+                            <label class="block text-sm font-semibold text-gray-700 mb-3">
+                                🗜️ Компрессия диалога: <span id="compression-threshold-value">Выключена</span>
+                            </label>
+                            <input
+                                    class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                                    id="compression-threshold-slider"
+                                    max="20"
+                                    min="0"
+                                    step="1"
+                                    type="range"
+                                    value="0"
+                            />
+                            <div class="flex justify-between text-xs text-gray-500 mt-2">
+                                <span>0 - Выключена</span>
+                                <span>20 - Каждые 20 сообщений</span>
+                            </div>
+                            <div class="mt-4 space-y-2 hidden" id="summaries-container">
+                                <p class="text-xs font-semibold text-gray-600 mb-2">📝 История компрессий:</p>
+                            </div>
+                        </div>
+
                         <div class="mt-4">
                             <button
                                     class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2"

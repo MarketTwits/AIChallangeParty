@@ -121,7 +121,8 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String,
                         request.sessionId,
                         request.reasoningMode,
                         request.temperature,
-                        request.maxContextTokens
+                        request.maxContextTokens,
+                        request.compressionThreshold
                     )
 
                 call.respond(response)
