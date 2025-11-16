@@ -2,12 +2,14 @@ package com.markettwits.aichallenge
 
 import java.util.concurrent.ConcurrentHashMap
 
-class SessionManager {
+class SessionManager(private val repository: ConversationRepository) {
     private val sessions = ConcurrentHashMap<String, Agent>()
 
     fun getOrCreateSession(sessionId: String, clientFactory: () -> AnthropicClient): Agent {
         return sessions.getOrPut(sessionId) {
-            Agent(clientFactory())
+            val agent = Agent(clientFactory(), repository)
+            agent.loadHistory(sessionId)
+            agent
         }
     }
 
