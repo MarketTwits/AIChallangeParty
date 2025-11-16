@@ -14,7 +14,12 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
-fun Application.configureRouting(sessionManager: SessionManager, apiKey: String, huggingFaceKey: String) {
+fun Application.configureRouting(
+    sessionManager: SessionManager,
+    apiKey: String,
+    huggingFaceKey: String,
+    repository: ConversationRepository,
+) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
 
@@ -44,7 +49,8 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String,
                 val (response, structuredResponse, usage) = agent.chat(
                     request.message,
                     request.coachStyle ?: "default",
-                    request.maxContextTokens
+                    request.maxContextTokens,
+                    request.sessionId
                 )
                 val remainingMessages = agent.getRemainingMessages()
 
@@ -128,6 +134,81 @@ fun Application.configureRouting(sessionManager: SessionManager, apiKey: String,
                 call.respond(response)
             } catch (e: Exception) {
                 logger.error("Error processing reasoning chat request", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/messages/{sessionId}") {
+            try {
+                val sessionId = call.parameters["sessionId"] ?: ""
+                val messages = repository.loadMessages(sessionId)
+
+                // Convert messages to simple format for JSON serialization
+                val simpleMessages = messages.map { msg ->
+                    SimpleMessage(
+                        role = msg.role,
+                        content = msg.content.map { block ->
+                            SimpleContentBlock(
+                                type = block.type,
+                                text = block.text,
+                                id = block.id,
+                                name = block.name
+                            )
+                        }
+                    )
+                }
+
+                val response = ChatMessagesResponse(
+                    sessionId = sessionId,
+                    messages = simpleMessages,
+                    messageCount = messages.size
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                logger.error("Error getting chat messages", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/history/{sessionId}") {
+            try {
+                val sessionId = call.parameters["sessionId"] ?: ""
+                val agent = sessionManager.getOrCreateSession(sessionId) {
+                    AnthropicClient(apiKey)
+                }
+
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "sessionId" to sessionId,
+                        "messageCount" to agent.getMessageCount(),
+                        "remainingMessages" to agent.getRemainingMessages()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting chat history", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/chat/clear") {
+            try {
+                val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+                val agent = sessionManager.getSession(sessionId)
+                agent?.clearHistory(sessionId)
+                sessionManager.clearSession(sessionId)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "cleared"))
+            } catch (e: Exception) {
+                logger.error("Error clearing chat session", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to e.message)
