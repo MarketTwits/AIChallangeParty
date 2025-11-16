@@ -97,15 +97,54 @@ function updateContextProgress(totalInputTokens, contextLimit) {
 }
 
 function getOrCreateSessionId() {
-    let sessionId = sessionStorage.getItem('sessionId');
+    let sessionId = localStorage.getItem('currentSessionId');
     if (!sessionId) {
         sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        sessionStorage.setItem('sessionId', sessionId);
+        localStorage.setItem('currentSessionId', sessionId);
+        addSessionToList(sessionId);
     }
     return sessionId;
 }
 
-const sessionId = getOrCreateSessionId();
+function addSessionToList(sessionId) {
+    let sessions = JSON.parse(localStorage.getItem('sessions') || '[]');
+    if (!sessions.includes(sessionId)) {
+        sessions.push(sessionId);
+        localStorage.setItem('sessions', JSON.stringify(sessions));
+    }
+}
+
+function getAllSessions() {
+    return JSON.parse(localStorage.getItem('sessions') || '[]');
+}
+
+function switchSession(sessionId) {
+    localStorage.setItem('currentSessionId', sessionId);
+    location.reload();
+}
+
+function createNewSession() {
+    const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('currentSessionId', newSessionId);
+    addSessionToList(newSessionId);
+    location.reload();
+}
+
+function deleteSession(sessionId) {
+    let sessions = getAllSessions();
+    sessions = sessions.filter(s => s !== sessionId);
+    localStorage.setItem('sessions', JSON.stringify(sessions));
+
+    if (localStorage.getItem('currentSessionId') === sessionId) {
+        if (sessions.length > 0) {
+            switchSession(sessions[0]);
+        } else {
+            createNewSession();
+        }
+    }
+}
+
+let sessionId = getOrCreateSessionId();
 
 let isExpanded = false;
 
@@ -1267,3 +1306,168 @@ if (document.getElementById('tab-models')) {
         }
     });
 }
+
+const clearChatBtn = document.getElementById('clear-chat-btn');
+if (clearChatBtn) {
+    clearChatBtn.addEventListener('click', async () => {
+        const confirmed = confirm('Вы уверены, что хотите очистить историю диалога? Это действие нельзя отменить.');
+        if (!confirmed) return;
+
+        try {
+            const response = await fetch('/chat/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error('Ошибка при очистке диалога');
+            }
+
+            deleteSession(sessionId);
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+            alert('Произошла ошибка при очистке диалога: ' + error.message);
+        }
+    });
+}
+
+const newChatBtn = document.getElementById('new-chat-btn');
+if (newChatBtn) {
+    newChatBtn.addEventListener('click', () => {
+        createNewSession();
+    });
+}
+
+const sessionsListBtn = document.getElementById('sessions-list-btn');
+const sessionsModal = document.getElementById('sessions-modal');
+const closeSessionsModal = document.getElementById('close-sessions-modal');
+
+if (sessionsListBtn && sessionsModal) {
+    sessionsListBtn.addEventListener('click', () => {
+        renderSessionsList();
+        sessionsModal.classList.remove('hidden');
+    });
+}
+
+if (closeSessionsModal && sessionsModal) {
+    closeSessionsModal.addEventListener('click', () => {
+        sessionsModal.classList.add('hidden');
+    });
+}
+
+function renderSessionsList() {
+    const container = document.getElementById('sessions-list');
+    if (!container) return;
+
+    const sessions = getAllSessions();
+    const currentSessionId = localStorage.getItem('currentSessionId');
+
+    if (sessions.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-center py-4">Нет сохранённых диалогов</p>';
+        return;
+    }
+
+    container.innerHTML = sessions.map((sid, index) => {
+        const isCurrent = sid === currentSessionId;
+        const date = new Date(parseInt(sid.split('_')[1]));
+        const dateStr = date.toLocaleString('ru-RU');
+
+        return `
+            <div class="flex items-center justify-between p-3 border rounded-lg ${
+            isCurrent ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
+        }">
+                <div class="flex-1">
+                    <div class="font-semibold">${isCurrent ? '🟢 ' : ''}Диалог ${index + 1}</div>
+                    <div class="text-xs text-gray-500">${dateStr}</div>
+                </div>
+                <div class="flex space-x-2">
+                    ${!isCurrent ? `
+                        <button onclick="switchSession('${sid}')"
+                                class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
+                            Открыть
+                        </button>
+                    ` : ''}
+                    <button onclick="confirmDeleteSession('${sid}')"
+                            class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
+                        Удалить
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function confirmDeleteSession(sid) {
+    if (confirm('Удалить этот диалог?')) {
+        deleteSession(sid);
+    }
+}
+
+// Load chat history from server
+async function loadChatHistory(sessionId) {
+    try {
+        const response = await fetch(`/chat/messages/${sessionId}`);
+        if (!response.ok) {
+            console.warn('Failed to load chat history');
+            return;
+        }
+
+        const data = await response.json();
+        const messages = data.messages || [];
+
+        // Clear current messages except the welcome message
+        while (messagesContainer.children.length > 1) {
+            messagesContainer.removeChild(messagesContainer.lastChild);
+        }
+
+        // Add messages from history
+        messages.forEach(msg => {
+            if (msg.role === 'user') {
+                // Extract text from content blocks
+                const text = msg.content
+                    .filter(block => block.type === 'text')
+                    .map(block => block.text)
+                    .join(' ');
+                if (text) {
+                    addMessage('user', text);
+                }
+            } else if (msg.role === 'assistant') {
+                // Extract text from content blocks
+                const text = msg.content
+                    .filter(block => block.type === 'text')
+                    .map(block => block.text)
+                    .join(' ');
+                if (text) {
+                    // Try to parse as structured response
+                    let structuredResponse = null;
+                    try {
+                        const cleanedText = text
+                            .replace(/```json/g, '')
+                            .replace(/```/g, '')
+                            .trim();
+                        structuredResponse = JSON.parse(cleanedText);
+                    } catch (e) {
+                        // Not a structured response, use plain text
+                    }
+
+                    addMessage('assistant', text, structuredResponse);
+                }
+            }
+        });
+
+        console.log(`Loaded ${messages.length} messages from history`);
+    } catch (error) {
+        console.error('Error loading chat history:', error);
+    }
+}
+
+// Initialize chat history when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadCoachStyle();
+    loadChatHistory(sessionId);
+});

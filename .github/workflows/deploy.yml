@@ -2,6 +2,8 @@ name: Deploy to VPS
 
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, master ]
 
 jobs:
   deploy:
@@ -16,7 +18,31 @@ jobs:
 
       - name: Build Docker image
         run: |
-          docker build --platform linux/amd64 -t ai-running-coach:latest .
+          docker build --platform linux/amd64 --no-cache -t ai-running-coach:latest .
+
+      - name: Test Docker image
+        run: |
+          # Start container for testing
+          docker run -d --name test-container -p 8081:8080 \
+            -e ANTHROPIC_API_KEY=test_key \
+            -e HUGGINGFACE_API_KEY=test_key \
+            ai-running-coach:latest
+
+          # Wait for container to start
+          sleep 20
+
+          # Test health endpoint
+          if curl -f http://localhost:8081/health; then
+            echo "✅ Health check passed"
+          else
+            echo "❌ Health check failed"
+            docker logs test-container
+            exit 1
+          fi
+
+          # Stop test container
+          docker stop test-container
+          docker rm test-container
 
       - name: Save Docker image
         run: |
@@ -29,7 +55,7 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
           source: "ai-running-coach.tar.gz"
-          target: "~/ai-coauch/"
+          target: "~/ai-coach/"
 
       - name: Load and restart container on VPS
         uses: appleboy/ssh-action@v1.0.3
@@ -38,8 +64,51 @@ jobs:
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
           script: |
-            cd ~/ai-coauch
+            set -e  # Exit on any error
+
+            echo "🚀 Starting deployment..."
+            cd ~/ai-coach
+
+            echo "🛑 Stopping current container..."
+            docker compose down || true
+            sleep 5
+
+            echo "🗑️ Removing old image..."
+            docker rmi ai-running-coach:latest 2>/dev/null || true
+
+            echo "📦 Loading new image..."
             gunzip -c ai-running-coach.tar.gz | docker load
-            docker compose down
+
+            echo "🚀 Starting new container..."
+            docker compose pull  # Ensure we have the latest image
             docker compose up -d
+
+            echo "⏳ Waiting for container to start..."
+            sleep 15
+
+            echo "🏥 Checking health..."
+            sleep 10
+
+            # Check if container is running
+            if docker ps | grep -q ai-running-coach; then
+              echo "✅ Container is running"
+            else
+              echo "❌ Container failed to start"
+              docker compose logs ai-running-coach
+              exit 1
+            fi
+
+            # Check health endpoint (if curl is available)
+            if command -v curl &> /dev/null; then
+              if curl -f -s http://localhost:8080/health > /dev/null; then
+                echo "✅ Health check passed"
+              else
+                echo "⚠️ Health check failed, but container is running"
+                docker compose logs ai-running-coach --tail 20
+              fi
+            fi
+
+            echo "🧹 Cleaning up..."
             docker system prune -f
+
+            echo "✅ Deployment completed successfully!"

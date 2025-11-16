@@ -3,7 +3,7 @@ package com.markettwits.aichallenge
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
 
-class Agent(private val client: AnthropicClient) {
+class Agent(private val client: AnthropicClient, private val repository: ConversationRepository) {
     private val logger = LoggerFactory.getLogger(Agent::class.java)
     private val conversationHistory = mutableListOf<Message>()
     private val tools = Tools.getAllTools()
@@ -13,6 +13,7 @@ class Agent(private val client: AnthropicClient) {
     private var maxContextTokens: Int? = null
     private var totalInputTokens = 0
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private var currentSessionId: String? = null
 
     private fun getCommonPrompt(): String = """
         ВАЖНО: Отвечай ТОЛЬКО на вопросы о:
@@ -159,12 +160,27 @@ class Agent(private val client: AnthropicClient) {
         """.trimIndent()
     }
 
+    fun loadHistory(sessionId: String) {
+        currentSessionId = sessionId
+        val savedMessages = repository.loadMessages(sessionId)
+        conversationHistory.clear()
+        conversationHistory.addAll(savedMessages)
+        messageCount = conversationHistory.count { it.role == "user" }
+        logger.info("Loaded ${savedMessages.size} messages for session $sessionId, messageCount: $messageCount")
+    }
+
     suspend fun chat(
         userMessage: String,
         coachStyle: String = "default",
         contextLimit: Int? = null,
+        sessionId: String? = null,
     ): Triple<String, StructuredLLMResponse?, Usage?> {
         logger.info("Received user message: $userMessage")
+
+        if (sessionId != null && currentSessionId != sessionId) {
+            loadHistory(sessionId)
+        }
+        val activeSessionId = sessionId ?: currentSessionId
 
         if (contextLimit != null && maxContextTokens == null) {
             maxContextTokens = contextLimit
@@ -183,12 +199,15 @@ class Agent(private val client: AnthropicClient) {
             return Triple("CONTEXT_LIMIT_EXCEEDED", null, Usage(totalInputTokens, 0))
         }
 
-        conversationHistory.add(
-            Message(
-                role = "user",
-                content = listOf(ContentBlock(type = "text", text = userMessage))
-            )
+        val userMessageObj = Message(
+            role = "user",
+            content = listOf(ContentBlock(type = "text", text = userMessage))
         )
+        conversationHistory.add(userMessageObj)
+
+        if (activeSessionId != null) {
+            repository.saveMessage(activeSessionId, userMessageObj)
+        }
 
         var iterations = 0
         var finalResponse = ""
@@ -280,28 +299,38 @@ class Agent(private val client: AnthropicClient) {
             }
 
             if (hasToolUse) {
-                conversationHistory.add(
-                    Message(
-                        role = "assistant",
-                        content = assistantContent
-                    )
+                val assistantMessage = Message(
+                    role = "assistant",
+                    content = assistantContent
                 )
+                conversationHistory.add(assistantMessage)
 
-                conversationHistory.add(
-                    Message(
-                        role = "user",
-                        content = toolResults
-                    )
+                if (activeSessionId != null) {
+                    repository.saveMessage(activeSessionId, assistantMessage)
+                }
+
+                val toolResultMessage = Message(
+                    role = "user",
+                    content = toolResults
                 )
+                conversationHistory.add(toolResultMessage)
+
+                if (activeSessionId != null) {
+                    repository.saveMessage(activeSessionId, toolResultMessage)
+                }
             }
 
             if (!hasToolUse) {
-                conversationHistory.add(
-                    Message(
-                        role = "assistant",
-                        content = assistantContent
-                    )
+                val assistantMessage = Message(
+                    role = "assistant",
+                    content = assistantContent
                 )
+                conversationHistory.add(assistantMessage)
+
+                if (activeSessionId != null) {
+                    repository.saveMessage(activeSessionId, assistantMessage)
+                }
+
                 finalResponse = textResponse
                 logger.info("Final response generated, no more tools to use")
                 break
@@ -312,12 +341,15 @@ class Agent(private val client: AnthropicClient) {
             logger.warn("Max iterations reached, using last text response")
             if (finalResponse.isEmpty() && lastTextResponse.isNotEmpty()) {
                 finalResponse = lastTextResponse
-                conversationHistory.add(
-                    Message(
-                        role = "assistant",
-                        content = listOf(ContentBlock(type = "text", text = lastTextResponse))
-                    )
+                val assistantMessage = Message(
+                    role = "assistant",
+                    content = listOf(ContentBlock(type = "text", text = lastTextResponse))
                 )
+                conversationHistory.add(assistantMessage)
+
+                if (activeSessionId != null) {
+                    repository.saveMessage(activeSessionId, assistantMessage)
+                }
             } else if (finalResponse.isEmpty()) {
                 finalResponse = "Превышено максимальное количество итераций обработки инструментов"
             }
@@ -387,11 +419,16 @@ class Agent(private val client: AnthropicClient) {
         return null
     }
 
-    fun clearHistory() {
+    fun clearHistory(sessionId: String? = null) {
+        val targetSessionId = sessionId ?: currentSessionId
+        if (targetSessionId != null) {
+            repository.clearHistory(targetSessionId)
+        }
         conversationHistory.clear()
         messageCount = 0
         totalInputTokens = 0
         maxContextTokens = null
+        currentSessionId = null
     }
 
     fun getMessageCount(): Int = messageCount

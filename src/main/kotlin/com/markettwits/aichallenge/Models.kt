@@ -57,11 +57,11 @@ data class ChatResponse(
 data class StructuredLLMResponse(
     val tag: String,
     val answer: String,
-    val answerTimestamp: String,
+    val answerTimestamp: String? = null,
     val coachMood: String? = null,
     val intensityLevel: String? = null,
     val nextAction: String? = null,
-    val planCreated: Boolean? = false
+    val planCreated: Boolean? = false,
 )
 
 @Serializable
@@ -130,4 +130,25 @@ data class DialogSummary(
     val timestamp: String,
     val tokensBeforeCompression: Int,
     val tokensAfterCompression: Int,
+)
+
+@Serializable
+data class SimpleMessage(
+    val role: String,
+    val content: List<SimpleContentBlock>,
+)
+
+@Serializable
+data class SimpleContentBlock(
+    val type: String,
+    val text: String? = null,
+    val id: String? = null,
+    val name: String? = null,
+)
+
+@Serializable
+data class ChatMessagesResponse(
+    val sessionId: String,
+    val messages: List<SimpleMessage>,
+    val messageCount: Int,
 )
