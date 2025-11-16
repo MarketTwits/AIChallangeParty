@@ -29,9 +29,14 @@ fun main() {
     println("  ANTHROPIC_API_KEY: ${apiKey.take(10)}... (length: ${apiKey.length})")
     println("  HUGGINGFACE_API_KEY: ${huggingFaceKey.take(10)}... (length: ${huggingFaceKey.length})")
 
-    val sessionManager = SessionManager()
+    val repository = ConversationRepository()
+    val sessionManager = SessionManager(repository)
 
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
+    val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
+
+    println("Starting server on port $port")
+
+    embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
@@ -47,7 +52,7 @@ fun main() {
             allowMethod(HttpMethod.Options)
         }
 
-        configureRouting(sessionManager, apiKey, huggingFaceKey)
+        configureRouting(sessionManager, apiKey, huggingFaceKey, repository)
 
         routing {
             staticResources("/", "static")

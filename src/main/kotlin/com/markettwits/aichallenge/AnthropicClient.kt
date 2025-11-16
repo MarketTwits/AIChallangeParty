@@ -57,6 +57,7 @@ class AnthropicClient(private val apiKey: String) {
         logger.debug("Request: messages count=${messages.size}, tools count=${tools?.size ?: 0}")
 
         return try {
+            logger.info("Connecting to $apiUrl...")
             val response: HttpResponse = client.post(apiUrl) {
                 header("x-api-key", apiKey)
                 header("anthropic-version", "2023-06-01")
@@ -74,8 +75,20 @@ class AnthropicClient(private val apiKey: String) {
             }
 
             response.body()
+        } catch (e: java.nio.channels.UnresolvedAddressException) {
+            logger.error(
+                "DNS resolution failed for api.anthropic.com. Check your internet connection or DNS settings.",
+                e
+            )
+            throw Exception("Не удалось подключиться к API Claude. Проверьте интернет-соединение.")
+        } catch (e: java.net.ConnectException) {
+            logger.error("Connection failed to Anthropic API", e)
+            throw Exception("Не удалось подключиться к API Claude. Проверьте интернет-соединение.")
+        } catch (e: java.net.SocketTimeoutException) {
+            logger.error("Timeout connecting to Anthropic API", e)
+            throw Exception("Превышено время ожидания ответа от API Claude.")
         } catch (e: Exception) {
-            logger.error("Error calling Anthropic API", e)
+            logger.error("Error calling Anthropic API: ${e.javaClass.simpleName} - ${e.message}", e)
             throw e
         }
     }
