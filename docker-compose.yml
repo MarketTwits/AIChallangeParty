@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   ai-coach:
     image: ai-running-coach:latest
@@ -12,17 +10,10 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
-    # Pull latest image before starting
-    pull_policy: always
-    # Force recreation when image changes
-    deploy:
-      restart_policy:
-        condition: unless-stopped
-        delay: 5s
-        max_attempts: 3
-        window: 30s
+    # Use local image only
+    pull_policy: never
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      test: [ "CMD", "java", "-cp", "app.jar", "com.markettwits.aichallenge.HealthCheck" ]
       interval: 30s
       timeout: 10s
       retries: 3

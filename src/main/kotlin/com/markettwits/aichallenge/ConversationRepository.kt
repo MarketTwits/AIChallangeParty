@@ -17,7 +17,7 @@ object ConversationMessages : Table("conversation_messages") {
     override val primaryKey = PrimaryKey(id)
 }
 
-class ConversationRepository(databasePath: String = "./data/conversations.db") {
+class ConversationRepository(databasePath: String = "/app/data/conversations.db") {
     private val logger = LoggerFactory.getLogger(ConversationRepository::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
 

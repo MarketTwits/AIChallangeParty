@@ -18,9 +18,6 @@ RUN ./gradlew shadowJar --no-daemon --stacktrace
 
 FROM eclipse-temurin:17-jre-alpine
 
-# Add curl for health check
-RUN apk add --no-cache curl
-
 WORKDIR /app
 
 # Copy the fat jar
@@ -29,7 +26,7 @@ COPY --from=build /app/build/libs/*-all.jar app.jar
 # Create data directory and set permissions
 RUN mkdir -p /app/data && \
     chown -R 1000:1000 /app && \
-    chmod +x /app/data
+    chmod 777 /app/data
 
 VOLUME /app/data
 
@@ -38,8 +35,8 @@ EXPOSE 8080
 # Use non-root user for security
 USER 1000:1000
 
-# Health check
+# Simple health check using Java
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD java -cp app.jar com.markettwits.aichallenge.HealthCheck || exit 1
 
 CMD ["java", "-Djava.security.egd=file:/dev/./urandom", "-jar", "app.jar"]
