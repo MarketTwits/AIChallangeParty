@@ -251,5 +251,39 @@ fun Application.configureRouting(
         get("/health") {
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
         }
+
+        // MCP эндпоинт для получения списка инструментов
+        get("/mcp/tools") {
+            try {
+                val mcpClient = McpClient()
+                val tools = mcpClient.connectToMcpServer()
+
+                val response = McpToolsResponse(
+                    tools = tools.map { tool ->
+                        McpToolResponse(
+                            name = tool.name,
+                            description = tool.description,
+                            inputSchema = tool.inputSchema
+                        )
+                    },
+                    count = tools.size,
+                    status = "connected"
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+                mcpClient.close()
+            } catch (e: Exception) {
+                logger.error("Error getting MCP tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf(
+                        "error" to e.message,
+                        "tools" to emptyList<Map<String, Any>>(),
+                        "count" to 0,
+                        "status" to "error"
+                    )
+                )
+            }
+        }
     }
 }

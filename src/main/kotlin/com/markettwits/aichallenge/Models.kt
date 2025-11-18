@@ -152,3 +152,19 @@ data class ChatMessagesResponse(
     val messages: List<SimpleMessage>,
     val messageCount: Int,
 )
+
+// MCP Response models
+@Serializable
+data class McpToolsResponse(
+    val tools: List<McpToolResponse>,
+    val count: Int,
+    val status: String,
+    val error: String? = null,
+)
+
+@Serializable
+data class McpToolResponse(
+    val name: String,
+    val description: String,
+    val inputSchema: JsonObject,
+)
