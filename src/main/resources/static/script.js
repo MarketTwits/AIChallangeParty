@@ -767,22 +767,26 @@ function initReasoningTab() {
     const tabTraining = document.getElementById('tab-training');
     const tabReasoning = document.getElementById('tab-reasoning');
     const tabModels = document.getElementById('tab-models');
+    const tabMcp = document.getElementById('tab-mcp');
     const trainingContent = document.getElementById('training-content');
     const reasoningContent = document.getElementById('reasoning-content');
     const modelsContent = document.getElementById('models-content');
+    const mcpContent = document.getElementById('mcp-content');
 
     console.log('Elements:', {
         tabTraining: !!tabTraining,
         tabReasoning: !!tabReasoning,
         tabModels: !!tabModels,
+        tabMcp: !!tabMcp,
         trainingContent: !!trainingContent,
         reasoningContent: !!reasoningContent,
-        modelsContent: !!modelsContent
+        modelsContent: !!modelsContent,
+        mcpContent: !!mcpContent
     });
 
-    if (!tabTraining || !tabReasoning || !tabModels || !trainingContent || !reasoningContent || !modelsContent) {
+    if (!tabTraining || !tabReasoning || !tabModels || !tabMcp || !trainingContent || !reasoningContent || !modelsContent || !mcpContent) {
         console.error('Tab elements not found!', {
-            tabTraining, tabReasoning, tabModels, trainingContent, reasoningContent, modelsContent
+            tabTraining, tabReasoning, tabModels, tabMcp, trainingContent, reasoningContent, modelsContent, mcpContent
         });
         return;
     }
@@ -793,9 +797,11 @@ function initReasoningTab() {
         tabTraining.classList.remove('active-tab');
         tabReasoning.classList.remove('active-tab');
         tabModels.classList.remove('active-tab');
+        tabMcp.classList.remove('active-tab');
         trainingContent.classList.remove('active');
         reasoningContent.classList.remove('active');
         modelsContent.classList.remove('active');
+        mcpContent.classList.remove('active');
 
         if (tab === 'training') {
             tabTraining.classList.add('active-tab');
@@ -806,6 +812,9 @@ function initReasoningTab() {
         } else if (tab === 'models') {
             tabModels.classList.add('active-tab');
             modelsContent.classList.add('active');
+        } else if (tab === 'mcp') {
+            tabMcp.classList.add('active-tab');
+            mcpContent.classList.add('active');
         }
         console.log('Tab switched successfully');
     }
@@ -821,6 +830,10 @@ function initReasoningTab() {
     tabModels.addEventListener('click', () => {
         console.log('Models tab clicked');
         switchTab('models');
+    });
+    tabMcp.addEventListener('click', () => {
+        console.log('MCP tab clicked');
+        switchTab('mcp');
     });
 
     console.log('Event listeners attached successfully');
@@ -1466,8 +1479,229 @@ async function loadChatHistory(sessionId) {
     }
 }
 
+// MCP Agent functionality
+let mcpSessionId = null;
+let mcpIsLoading = false;
+
+// Generate MCP session ID
+function generateMcpSessionId() {
+    return 'mcp_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Initialize MCP session
+function initializeMcpSession() {
+    mcpSessionId = generateMcpSessionId();
+    document.getElementById('mcp-session-id').textContent = mcpSessionId;
+    loadMcpStatus();
+    loadMcpTools();
+}
+
+// Load MCP status
+async function loadMcpStatus() {
+    try {
+        const response = await fetch('/mcp/status');
+        const data = await response.json();
+
+        if (response.ok) {
+            document.getElementById('mcp-github-status').textContent = data.githubTokenConfigured ? '✅ Configured' : '❌ Not set';
+        } else {
+            document.getElementById('mcp-github-status').textContent = '❌ Error';
+        }
+    } catch (error) {
+        document.getElementById('mcp-github-status').textContent = '❌ Offline';
+    }
+}
+
+// Load available MCP tools
+async function loadMcpTools() {
+    try {
+        const response = await fetch('/github/tools');
+        const data = await response.json();
+
+        const toolsContainer = document.getElementById('mcp-available-tools');
+        const toolsCount = document.getElementById('mcp-tools-count');
+
+        if (response.ok && data.status === 'connected') {
+            const tools = data.tools || [];
+            toolsCount.textContent = tools.length;
+
+            if (tools.length > 0) {
+                toolsContainer.innerHTML = tools.map(tool => `
+                    <div class="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <div class="font-semibold text-gray-800">${tool.name}</div>
+                        <div class="text-sm text-gray-600 mt-1">${tool.description}</div>
+                    </div>
+                `).join('');
+            } else {
+                toolsContainer.innerHTML = '<div class="text-center text-gray-500 col-span-2">Инструменты не найдены</div>';
+            }
+        } else {
+            toolsContainer.innerHTML = '<div class="text-center text-red-500 col-span-2">Ошибка загрузки инструментов</div>';
+            toolsCount.textContent = 'Error';
+        }
+    } catch (error) {
+        const toolsContainer = document.getElementById('mcp-available-tools');
+        const toolsCount = document.getElementById('mcp-tools-count');
+        toolsContainer.innerHTML = '<div class="text-center text-red-500 col-span-2">Ошибка сети</div>';
+        toolsCount.textContent = 'Offline';
+    }
+}
+
+// Add message to MCP chat
+function addMcpMessage(content, type, toolResults = null) {
+    const messagesContainer = document.getElementById('mcp-chat-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `mb-4 p-4 rounded-lg ${type === 'user' ? 'bg-blue-500 text-white ml-auto max-w-2xl' : 'bg-white text-gray-800 mr-auto max-w-4xl'}`;
+    messageDiv.style.marginLeft = type === 'user' ? 'auto' : '0';
+    messageDiv.style.marginRight = type === 'user' ? '0' : 'auto';
+
+    let messageHTML = `<div class="font-semibold mb-1">${type === 'user' ? '👤 Вы' : '🤖 MCP Agent'}</div>`;
+    messageHTML += `<div>${content}</div>`;
+
+    if (toolResults && toolResults.length > 0) {
+        messageHTML += '<div class="mt-3">';
+        messageHTML += '<div class="text-sm font-semibold text-gray-700 mb-2">🔧 Использованные инструменты:</div>';
+        toolResults.forEach(tool => {
+            messageHTML += `
+                <div class="bg-green-50 border-l-4 border-green-500 p-3 mb-2 text-sm">
+                    <div class="font-semibold">${tool.tool}</div>
+                    <div class="text-xs text-gray-600 mt-1">${tool.result.substring(0, 200)}${tool.result.length > 200 ? '...' : ''}</div>
+                </div>
+            `;
+        });
+        messageHTML += '</div>';
+    }
+
+    messageDiv.innerHTML = messageHTML;
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Show MCP loading
+function showMcpLoading() {
+    const messagesContainer = document.getElementById('mcp-chat-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'mcp-loading-message';
+    loadingDiv.className = 'mb-4 p-4 rounded-lg bg-white text-gray-800 mr-auto max-w-4xl';
+    loadingDiv.style.marginLeft = '0';
+    loadingDiv.style.marginRight = 'auto';
+
+    loadingDiv.innerHTML = `
+        <div class="font-semibold mb-1">🤖 MCP Agent</div>
+        <div class="inline-flex items-center">
+            <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500 mr-2"></div>
+            Думаю<span class="loading-dots"></span>
+        </div>
+    `;
+
+    messagesContainer.appendChild(loadingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+// Hide MCP loading
+function hideMcpLoading() {
+    const loadingMessage = document.getElementById('mcp-loading-message');
+    if (loadingMessage) {
+        loadingMessage.remove();
+    }
+}
+
+// Send MCP message
+async function sendMcpMessage() {
+    const input = document.getElementById('mcp-message-input');
+    const message = input.value.trim();
+
+    if (!message || mcpIsLoading) return;
+
+    mcpIsLoading = true;
+    const sendBtn = document.getElementById('mcp-send-btn');
+    sendBtn.disabled = true;
+
+    addMcpMessage(message, 'user');
+    input.value = '';
+    showMcpLoading();
+
+    try {
+        const response = await fetch('/mcp/chat', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: message,
+                sessionId: mcpSessionId
+            })
+        });
+
+        const data = await response.json();
+
+        hideMcpLoading();
+
+        if (response.ok) {
+            addMcpMessage(data.response, 'assistant', data.mcpResults);
+        } else {
+            addMcpMessage(`Ошибка: ${data.response || 'Произошла ошибка'}`, 'assistant');
+        }
+    } catch (error) {
+        hideMcpLoading();
+        addMcpMessage(`Ошибка сети: ${error.message}`, 'assistant');
+    } finally {
+        mcpIsLoading = false;
+        sendBtn.disabled = false;
+    }
+}
+
+// Clear MCP chat
+async function clearMcpChat() {
+    if (!confirm('Вы уверены, что хотите очистить чат?')) return;
+
+    try {
+        await fetch('/mcp/clear', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                sessionId: mcpSessionId
+            })
+        });
+
+        // Reset session
+        mcpSessionId = generateMcpSessionId();
+        document.getElementById('mcp-session-id').textContent = mcpSessionId;
+
+        // Clear messages
+        const messagesContainer = document.getElementById('mcp-chat-messages');
+        messagesContainer.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <p class="text-lg mb-2">👋 Привет! Я MCP агент для работы с GitHub.</p>
+                <p class="text-sm">Спросите меня о репозиториях, пользователях или поиске на GitHub!</p>
+            </div>
+        `;
+    } catch (error) {
+        console.error('Error clearing MCP chat:', error);
+    }
+}
+
+// Insert MCP example
+function insertMcpExample(text) {
+    document.getElementById('mcp-message-input').value = text;
+    document.getElementById('mcp-message-input').focus();
+}
+
+// MCP event listeners
+document.getElementById('mcp-send-btn')?.addEventListener('click', sendMcpMessage);
+document.getElementById('mcp-message-input')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMcpMessage();
+    }
+});
+document.getElementById('mcp-clear-btn')?.addEventListener('click', clearMcpChat);
+
 // Initialize chat history when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadCoachStyle();
     loadChatHistory(sessionId);
+    initializeMcpSession();
 });

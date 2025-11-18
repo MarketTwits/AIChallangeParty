@@ -2,6 +2,7 @@ package com.markettwits.aichallenge
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
 @Serializable
 data class ChatRequest(
@@ -151,4 +152,59 @@ data class ChatMessagesResponse(
     val sessionId: String,
     val messages: List<SimpleMessage>,
     val messageCount: Int,
+)
+
+// MCP API Response models
+@Serializable
+data class McpToolsResponse(
+    val tools: List<McpToolResponse>,
+    val count: Int,
+    val status: String,
+    val error: String? = null,
+)
+
+@Serializable
+data class McpToolResponse(
+    val name: String,
+    val description: String,
+    val inputSchema: JsonObject,
+)
+
+// GitHub API Response models
+@Serializable
+data class GitHubToolsResponse(
+    val tools: List<GitHubToolResponse>,
+    val count: Int,
+    val status: String,
+    val error: String? = null,
+)
+
+@Serializable
+data class GitHubToolResponse(
+    val name: String,
+    val description: String,
+    val inputSchema: JsonObject,
+)
+
+@Serializable
+data class GitHubExecuteRequest(
+    val tool: String,
+    val parameters: JsonObject = buildJsonObject { },
+)
+
+@Serializable
+data class GitHubExecuteResponse(
+    val tool: String,
+    val result: String,
+    val success: Boolean,
+    val error: String? = null,
+)
+
+// MCP Status Response model
+@Serializable
+data class McpStatusResponse(
+    val status: String,
+    val activeSessions: Int,
+    val githubTokenConfigured: Boolean,
+    val error: String? = null,
 )

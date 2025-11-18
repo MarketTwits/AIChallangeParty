@@ -12,6 +12,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 import org.slf4j.LoggerFactory
 
 fun Application.configureRouting(
@@ -22,6 +23,7 @@ fun Application.configureRouting(
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
+    val mcpAgents = mutableMapOf<String, McpAgent>()
 
     val hfKeyMasked = if (huggingFaceKey.length > 8) {
         "${huggingFaceKey.substring(0, 8)}...${huggingFaceKey.substring(huggingFaceKey.length - 4)}"
@@ -250,6 +252,184 @@ fun Application.configureRouting(
 
         get("/health") {
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
+        }
+
+        // GitHub Tools endpoint
+        get("/github/tools") {
+            try {
+                val gitHubServer = GitHubMcpServer()
+                val tools = gitHubServer.getAvailableTools()
+
+                val response = GitHubToolsResponse(
+                    tools = tools.map { tool ->
+                        GitHubToolResponse(
+                            name = tool.name,
+                            description = tool.description,
+                            inputSchema = tool.inputSchema
+                        )
+                    },
+                    count = tools.size,
+                    status = "connected"
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+                gitHubServer.close()
+            } catch (e: Exception) {
+                logger.error("Error getting GitHub tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    GitHubToolsResponse(
+                        tools = emptyList(),
+                        count = 0,
+                        status = "error",
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        // GitHub Tool execution endpoint
+        post("/github/execute") {
+            try {
+                val request = call.receive<GitHubExecuteRequest>()
+
+                // Convert JsonObject to Map<String, Any>
+                val parameters = mutableMapOf<String, Any>()
+                request.parameters.forEach { (key, value) ->
+                    parameters[key] = when {
+                        value is kotlinx.serialization.json.JsonPrimitive -> value.content
+                        else -> value.toString()
+                    }
+                }
+
+                val gitHubServer = GitHubMcpServer()
+                val result = gitHubServer.executeTool(request.tool, parameters)
+                gitHubServer.close()
+
+                call.respond(
+                    HttpStatusCode.OK, GitHubExecuteResponse(
+                        tool = request.tool,
+                        result = result,
+                        success = true
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error executing GitHub tool", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    GitHubExecuteResponse(
+                        tool = "",
+                        result = "",
+                        success = false,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        get("/mcp/tools") {
+            try {
+                val mcpClient = McpClient()
+                val tools = mcpClient.connectToMcpServer()
+
+                val response = McpToolsResponse(
+                    tools = tools.map { tool ->
+                        McpToolResponse(
+                            name = tool.name,
+                            description = tool.description,
+                            inputSchema = tool.inputSchema
+                        )
+                    },
+                    count = tools.size,
+                    status = "connected"
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+                mcpClient.close()
+            } catch (e: Exception) {
+                logger.error("Error getting MCP tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf(
+                        "error" to e.message,
+                        "tools" to emptyList<Map<String, Any>>(),
+                        "count" to 0,
+                        "status" to "error"
+                    )
+                )
+            }
+        }
+
+        // MCP Agent endpoints
+        post("/mcp/chat") {
+            try {
+                val request = call.receive<McpChatRequest>()
+                logger.info("Received MCP chat request from session ${request.sessionId}: ${request.message}")
+
+                val agent = mcpAgents.getOrPut(request.sessionId) {
+                    McpAgent(AnthropicClient(apiKey))
+                }
+
+                val response = agent.chat(
+                    request.message,
+                    request.sessionId,
+                    request.temperature,
+                    request.maxContextTokens
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                logger.error("Error processing MCP chat request", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    McpChatResponse(
+                        response = "Error: ${e.message}",
+                        timestamp = java.time.Instant.now().toString(),
+                        mcpResults = listOf(
+                            McpToolResult(
+                                tool = "error",
+                                parameters = buildJsonObject {},
+                                result = e.message ?: "Unknown error",
+                                success = false,
+                                timestamp = java.time.Instant.now().toString()
+                            )
+                        )
+                    )
+                )
+            }
+        }
+
+        post("/mcp/clear") {
+            try {
+                val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+                mcpAgents[sessionId]?.close()
+                mcpAgents.remove(sessionId)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "cleared"))
+            } catch (e: Exception) {
+                logger.error("Error clearing MCP chat session", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/mcp/status") {
+            try {
+                val status = McpStatusResponse(
+                    status = "active",
+                    activeSessions = mcpAgents.size,
+                    githubTokenConfigured = ((System.getProperty("GITHUB_TOKEN")
+                        ?: System.getenv("GITHUB_TOKEN"))?.isNotEmpty() == true)
+                )
+                call.respond(HttpStatusCode.OK, status)
+            } catch (e: Exception) {
+                logger.error("Error getting MCP status", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    McpStatusResponse(status = "error", activeSessions = 0, githubTokenConfigured = false)
+                )
+            }
         }
     }
 }

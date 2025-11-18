@@ -26,6 +26,7 @@ jobs:
           docker run -d --name test-container -p 8081:8080 \
             -e ANTHROPIC_API_KEY=test_key \
             -e HUGGINGFACE_API_KEY=test_key \
+            -e GITHUB_TOKEN=test_key \
             ai-running-coach:latest
 
           # Wait for container to start

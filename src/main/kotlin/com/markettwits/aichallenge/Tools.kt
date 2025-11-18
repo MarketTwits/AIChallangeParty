@@ -1,5 +1,6 @@
 package com.markettwits.aichallenge
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.*
 
 object Tools {
@@ -7,7 +8,11 @@ object Tools {
         return listOf(
             getAssessFitnessLevelTool(),
             getGenerateTrainingPlanTool(),
-            getRecoveryRecommendationsTool()
+            getRecoveryRecommendationsTool(),
+            getGitHubSearchTool(),
+            getGitHubRepositoryTool(),
+            getGitHubUserRepositoriesTool(),
+            getGitHubUserInfoTool()
         )
     }
 
@@ -120,6 +125,10 @@ object Tools {
                 "assess_fitness_level" -> executeAssessFitnessLevel(input)
                 "generate_training_plan" -> executeGenerateTrainingPlan(input)
                 "get_recovery_recommendations" -> executeGetRecoveryRecommendations(input)
+                "github_search_repositories" -> executeGitHubSearch(input)
+                "github_get_repository" -> executeGetGitHubRepository(input)
+                "github_get_user_repositories" -> executeGetUserRepositories(input)
+                "github_get_user_info" -> executeGetUserInfo(input)
                 else -> "Unknown tool: $toolName"
             }
         } catch (e: Exception) {
@@ -128,7 +137,7 @@ object Tools {
     }
 
     private fun executeAssessFitnessLevel(input: JsonObject): String {
-        val age = input["age"]?.jsonPrimitive?.int ?: return "Missing age"
+        input["age"]?.jsonPrimitive?.int ?: return "Missing age"
         val experience = input["running_experience"]?.jsonPrimitive?.content ?: return "Missing running_experience"
         val weeklyRuns = input["weekly_runs"]?.jsonPrimitive?.int ?: return "Missing weekly_runs"
         val maxDistance = input["max_distance_km"]?.jsonPrimitive?.double ?: return "Missing max_distance_km"
@@ -348,6 +357,157 @@ object Tools {
             put("stretching", stretching)
             put("injury_prevention", injuryPrevention)
         }.toString()
+    }
+
+    // GitHub API Tools
+    private fun getGitHubSearchTool(): Tool {
+        return Tool(
+            name = "github_search_repositories",
+            description = "Search for repositories on GitHub",
+            input_schema = InputSchema(
+                type = "object",
+                properties = buildJsonObject {
+                    put("query", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Search query for repositories")
+                    })
+                    put("limit", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "Maximum number of results (1-100)")
+                        put("default", 10)
+                    })
+                },
+                required = listOf("query")
+            )
+        )
+    }
+
+    private fun getGitHubRepositoryTool(): Tool {
+        return Tool(
+            name = "github_get_repository",
+            description = "Get detailed information about a specific repository",
+            input_schema = InputSchema(
+                type = "object",
+                properties = buildJsonObject {
+                    put("owner", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Repository owner username")
+                    })
+                    put("repo", buildJsonObject {
+                        put("type", "string")
+                        put("description", "Repository name")
+                    })
+                },
+                required = listOf("owner", "repo")
+            )
+        )
+    }
+
+    private fun getGitHubUserRepositoriesTool(): Tool {
+        return Tool(
+            name = "github_get_user_repositories",
+            description = "Get repositories for a specific user",
+            input_schema = InputSchema(
+                type = "object",
+                properties = buildJsonObject {
+                    put("username", buildJsonObject {
+                        put("type", "string")
+                        put("description", "GitHub username")
+                    })
+                    put("limit", buildJsonObject {
+                        put("type", "integer")
+                        put("description", "Maximum number of repositories (1-100)")
+                        put("default", 10)
+                    })
+                },
+                required = listOf("username")
+            )
+        )
+    }
+
+    private fun getGitHubUserInfoTool(): Tool {
+        return Tool(
+            name = "github_get_user_info",
+            description = "Get information about a GitHub user",
+            input_schema = InputSchema(
+                type = "object",
+                properties = buildJsonObject {
+                    put("username", buildJsonObject {
+                        put("type", "string")
+                        put("description", "GitHub username")
+                    })
+                },
+                required = listOf("username")
+            )
+        )
+    }
+
+    // GitHub Tool Execution Methods
+    private fun executeGitHubSearch(input: JsonObject): String {
+        val query = input["query"]?.jsonPrimitive?.content ?: return "Missing query"
+        val limit = input["limit"]?.jsonPrimitive?.int ?: 10
+
+        return runCatching {
+            runBlocking {
+                val gitHubServer = GitHubMcpServer()
+                val result = gitHubServer.executeTool(
+                    "github_search_repositories",
+                    mapOf("query" to query, "limit" to limit)
+                )
+                gitHubServer.close()
+                result
+            }
+        }.getOrElse { "Error searching GitHub repositories: ${it.message}" }
+    }
+
+    private fun executeGetGitHubRepository(input: JsonObject): String {
+        val owner = input["owner"]?.jsonPrimitive?.content ?: return "Missing owner"
+        val repo = input["repo"]?.jsonPrimitive?.content ?: return "Missing repo"
+
+        return runCatching {
+            runBlocking {
+                val gitHubServer = GitHubMcpServer()
+                val result = gitHubServer.executeTool(
+                    "github_get_repository",
+                    mapOf("owner" to owner, "repo" to repo)
+                )
+                gitHubServer.close()
+                result
+            }
+        }.getOrElse { "Error getting GitHub repository: ${it.message}" }
+    }
+
+    private fun executeGetUserRepositories(input: JsonObject): String {
+        val username = input["username"]?.jsonPrimitive?.content ?: return "Missing username"
+        val limit = input["limit"]?.jsonPrimitive?.int ?: 10
+
+        return runCatching {
+            runBlocking {
+                val gitHubServer = GitHubMcpServer()
+                val result = gitHubServer.executeTool(
+                    "github_get_user_repositories",
+                    mapOf("username" to username, "limit" to limit)
+                )
+                gitHubServer.close()
+                result
+            }
+        }.getOrElse { "Error getting user repositories: ${it.message}" }
+    }
+
+    private fun executeGetUserInfo(input: JsonObject): String {
+        val username = input["username"]?.jsonPrimitive?.content ?: return "Missing username"
+
+        return runCatching {
+            runBlocking {
+                val gitHubServer = GitHubMcpServer()
+                val result = gitHubServer.executeTool(
+                    "github_get_user_info",
+                    mapOf("username" to username)
+                )
+                gitHubServer.close()
+                result
+            }
+        }.getOrElse { "Error getting GitHub user info: ${it.message}" }
     }
 
 }
