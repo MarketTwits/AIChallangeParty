@@ -25,9 +25,20 @@ fun main() {
         ?: System.getenv("HUGGINGFACE_API_KEY")
         ?: throw IllegalStateException("HUGGINGFACE_API_KEY not found in .env file or environment variables")
 
+    // Load GitHub Token (optional)
+    val gitHubToken = dotenv["GITHUB_TOKEN"] ?: System.getenv("GITHUB_TOKEN") ?: ""
+    if (gitHubToken.isNotEmpty()) {
+        System.setProperty("GITHUB_TOKEN", gitHubToken)
+    }
+
     println("Loaded API Keys:")
     println("  ANTHROPIC_API_KEY: ${apiKey.take(10)}... (length: ${apiKey.length})")
     println("  HUGGINGFACE_API_KEY: ${huggingFaceKey.take(10)}... (length: ${huggingFaceKey.length})")
+    if (gitHubToken.isNotEmpty()) {
+        println("  GITHUB_TOKEN: ${gitHubToken.take(10)}...${gitHubToken.takeLast(4)} (length: ${gitHubToken.length})")
+    } else {
+        println("  GITHUB_TOKEN: Not configured")
+    }
 
     val repository = ConversationRepository()
     val sessionManager = SessionManager(repository)

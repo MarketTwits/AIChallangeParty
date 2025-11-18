@@ -7,8 +7,10 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - HUGGINGFACE_API_KEY=${HUGGINGFACE_API_KEY}
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
     volumes:
       - ./data:/app/data
+      - ./.env:/app/.env:ro
     restart: unless-stopped
     # Use local image only
     pull_policy: never

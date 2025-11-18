@@ -26,24 +26,15 @@ class McpClient {
     private val objectMapper = ObjectMapper().registerModule(KotlinModule.Builder().build())
     private val client = HttpClient(CIO)
 
-    /**
-     * Создает MCP-соединение через stdio с локальным MCP сервером
-     * Для простоты используем вызов npm пакета @modelcontextprotocol/cli
-     */
     suspend fun connectToMcpServer(): List<McpTool> {
         return try {
-            // Простой способ - запустить MCP сервер и получить инструменты
-            // Для демо используем встроенный список инструментов Claude Code
             getBuiltInTools()
         } catch (e: Exception) {
-            println("Ошибка подключения к MCP: ${e.message}")
+            println("Error connecting to MCP: ${e.message}")
             emptyList()
         }
     }
 
-    /**
-     * Получает список инструментов, доступных в текущем окружении Claude Code
-     */
     private fun getBuiltInTools(): List<McpTool> {
         return listOf(
             McpTool(
@@ -65,9 +56,7 @@ class McpClient {
                             put("description", "The type of specialized agent to use for this task")
                         })
                     })
-                    put("required", buildJsonObject {
-                        // Простая реализация для required array
-                    })
+                    put("required", buildJsonObject {})
                 }
             ),
             McpTool(
@@ -181,9 +170,6 @@ class McpClient {
         )
     }
 
-    /**
-     * Альтернативный метод для подключения к реальному MCP серверу через HTTP
-     */
     suspend fun connectToMcpServerHttp(serverUrl: String): List<McpTool> {
         return try {
             val response = client.get("$serverUrl/tools") {
@@ -197,7 +183,7 @@ class McpClient {
 
             parseToolsFromJson(jsonNode)
         } catch (e: Exception) {
-            println("Ошибка HTTP подключения к MCP: ${e.message}")
+            println("HTTP connection error to MCP: ${e.message}")
             emptyList()
         }
     }
@@ -210,7 +196,6 @@ class McpClient {
                 val name = toolNode.get("name")?.asText() ?: return@forEach
                 val description = toolNode.get("description")?.asText() ?: ""
 
-                // Создаем пустой JsonObject для простоты
                 val inputSchema = buildJsonObject { }
 
                 tools.add(McpTool(name, description, inputSchema))
@@ -225,28 +210,25 @@ class McpClient {
     }
 }
 
-/**
- * Главная функция для демонстрации работы MCP клиента
- */
 fun main() = runBlocking {
     val mcpClient = McpClient()
 
     try {
-        println("🔗 Подключение к MCP серверу...")
+        println("Connecting to MCP server...")
         val tools = mcpClient.connectToMcpServer()
 
-        println("\n✅ Найдено инструментов: ${tools.size}")
-        println("\n📋 Доступные инструменты:")
+        println("\nFound tools: ${tools.size}")
+        println("\nAvailable tools:")
 
         tools.forEachIndexed { index, tool ->
             println("${index + 1}. ${tool.name}")
-            println("   📝 Описание: ${tool.description}")
-            println("   ⚙️  Параметры: ${tool.inputSchema.keys.joinToString(", ")}")
+            println("   Description: ${tool.description}")
+            println("   Parameters: ${tool.inputSchema.keys.joinToString(", ")}")
             println()
         }
 
     } catch (e: Exception) {
-        println("❌ Ошибка: ${e.message}")
+        println("Error: ${e.message}")
     } finally {
         mcpClient.close()
     }

@@ -27,7 +27,7 @@ scp .env.example root@vps:~/ai-coach/.env
 
 ```bash
 cd ~/ai-coach
-nano .env  # Add ANTHROPIC_API_KEY
+nano .env  # Add ANTHROPIC_API_KEY and optionally GITHUB_TOKEN
 
 gunzip -c ai-running-coach.tar.gz | docker load
 docker compose up -d
@@ -48,6 +48,12 @@ sudo systemctl reload caddy
 ## Configuration
 
 **Required**: `ANTHROPIC_API_KEY` environment variable ([Get API key](https://console.anthropic.com/))
+
+**Optional**: `GITHUB_TOKEN` environment variable for MCP Agent GitHub
+integration ([Get Classic Personal Access Token](https://github.com/settings/tokens))
+
+- Required scopes: `repo` (for private repository access)
+- Required scopes: `public_repo` (for public repository access)
 
 ## Troubleshooting
 
