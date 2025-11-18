@@ -16,7 +16,7 @@ echo "🔨 Building Docker image for AMD64 platform..."
 docker build --platform linux/amd64 --no-cache -t ${IMAGE_NAME}:latest .
 
 echo "✅ Testing image locally..."
-docker run --rm --name test-container -p 8081:8080 -e ANTHROPIC_API_KEY=test -e HUGGINGFACE_API_KEY=test ${IMAGE_NAME}:latest &
+docker run --rm --name test-container -p 8081:8080 -e ANTHROPIC_API_KEY=test -e HUGGINGFACE_API_KEY=test -e GITHUB_TOKEN=test ${IMAGE_NAME}:latest &
 TEST_PID=$!
 
 # Wait for container to start
@@ -50,7 +50,8 @@ echo ""
 echo "To deploy on VPS:"
 echo "1. Upload ${OUTPUT_FILE} to your VPS: scp ${OUTPUT_FILE} root@your-vps:~/ai-coauch/"
 echo "2. Upload docker-compose.yml if changed: scp docker-compose.yml root@your-vps:~/ai-coauch/"
-echo "3. SSH to VPS and run:"
+echo "3. Make sure you have GITHUB_TOKEN in your environment on VPS"
+echo "4. SSH to VPS and run:"
 echo "   cd ~/ai-coauch"
 echo "   docker compose down"
 echo "   docker rmi ai-running-coach:latest 2>/dev/null || true"
