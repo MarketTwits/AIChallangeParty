@@ -34,6 +34,11 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-dao:0.46.0")
     implementation("org.jetbrains.exposed:exposed-jdbc:0.46.0")
 
+    // MCP Client
+    implementation("io.github.oshai:kotlin-logging-jvm:5.1.1")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.15.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.15.2")
+
     testImplementation(kotlin("test"))
 }
 
