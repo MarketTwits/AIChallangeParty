@@ -476,6 +476,7 @@
                     <button class="nav-link text-sm font-medium active-tab" id="tab-training">Тренер</button>
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
                     <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
+                    <button class="nav-link text-sm font-medium" id="tab-mcp">MCP Agent</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
                     <a href="https://sportsauce.ru/starts" target="_blank" class="nav-link text-sm font-medium">Старты</a>
@@ -997,6 +998,86 @@
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            </div>
+            <!-- MCP Agent Tab -->
+            <div class="tab-content" id="mcp-content">
+                <div class="chat-container p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🤖 MCP Agent - GitHub
+                        Assistant</h2>
+                    <p class="text-gray-600 mb-6">AI ассистент с доступом к GitHub через Model Context Protocol</p>
+
+                    <!-- Status Info -->
+                    <div class="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="text-center">
+                                <div class="font-semibold text-purple-700">Session ID</div>
+                                <div class="text-gray-700 font-mono" id="mcp-session-id">Loading...</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-semibold text-purple-700">GitHub Token</div>
+                                <div class="text-gray-700" id="mcp-github-status">Checking...</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-semibold text-purple-700">Available Tools</div>
+                                <div class="text-gray-700" id="mcp-tools-count">Loading...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat Container -->
+                    <div class="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mb-6">
+                        <div class="h-96 overflow-y-auto p-4 bg-gray-50" id="mcp-chat-messages">
+                            <div class="text-center text-gray-500 py-8">
+                                <p class="text-lg mb-2">👋 Привет! Я MCP агент для работы с GitHub.</p>
+                                <p class="text-sm">Спросите меня о репозиториях, пользователях или поиске на GitHub!</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input Form -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-4 mb-6">
+                        <div class="flex items-center space-x-4">
+                            <input class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                   id="mcp-message-input"
+                                   maxlength="500"
+                                   placeholder="Спросите о GitHub репозиториях или пользователях..."
+                                   type="text">
+                            <button class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                    id="mcp-send-btn">
+                                Отправить
+                            </button>
+                        </div>
+                        <div class="mt-2 flex justify-between items-center text-sm text-gray-500">
+                            <div class="space-x-4">
+                                <button class="hover:text-purple-600 transition-colors"
+                                        onclick="insertMcpExample('Найди популярные репозитории на Kotlin')">
+                                    💡 Пример 1
+                                </button>
+                                <button class="hover:text-purple-600 transition-colors"
+                                        onclick="insertMcpExample('Расскажи о пользователе JetBrains')">
+                                    💡 Пример 2
+                                </button>
+                                <button class="hover:text-purple-600 transition-colors"
+                                        onclick="insertMcpExample('Покажи мои репозитории')">
+                                    💡 Пример 3
+                                </button>
+                            </div>
+                            <button class="hover:text-red-600 transition-colors" id="mcp-clear-btn">
+                                🗑️ Очистить
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Available Tools -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">🔧 Доступные инструменты</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="mcp-available-tools">
+                            <div class="text-center text-gray-500 py-4 col-span-2">
+                                Загрузка инструментов...
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

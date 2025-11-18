@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>MCP Agent - GitHub Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .message {
+            @apply max-w-3xl mx-auto mb-4 p-4 rounded-lg shadow-md;
+        }
+
+        .user-message {
+            @apply bg-blue-500 text-white ml-auto;
+        }
+
+        .assistant-message {
+            @apply bg-gray-100 text-gray-800 mr-auto;
+        }
+
+        .tool-result {
+            @apply bg-green-50 border-l-4 border-green-500 p-3 mb-2 text-sm;
+        }
+
+        .loading-dots {
+            @apply inline-flex items-center;
+        }
+
+        .loading-dots::after {
+            content: '';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% {
+                content: '';
+            }
+            40% {
+                content: '.';
+            }
+            60% {
+                content: '..';
+            }
+            80%, 100% {
+                content: '...';
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="container mx-auto px-4 py-6 max-w-4xl">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-purple-600 to-blue-600 text-white p-6 rounded-lg shadow-lg mb-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold mb-1">🤖 MCP Agent</h1>
+                <p class="text-purple-100">GitHub assistant powered by Model Context Protocol</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="inline-flex items-center">
+                    <span class="w-2 h-2 bg-green-400 rounded-full mr-2" id="status-indicator"></span>
+                    <span class="text-sm" id="status-text">Connected</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Info -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div class="text-center">
+                <div class="font-semibold text-gray-700">Session ID</div>
+                <div class="text-gray-600" id="session-id">Loading...</div>
+            </div>
+            <div class="text-center">
+                <div class="font-semibold text-gray-700">GitHub Token</div>
+                <div class="text-gray-600" id="github-status">Checking...</div>
+            </div>
+            <div class="text-center">
+                <div class="font-semibold text-gray-700">Available Tools</div>
+                <div class="text-gray-600" id="tools-count">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat Container -->
+    <div class="bg-white rounded-lg shadow-lg overflow-hidden mb-6">
+        <div class="h-96 overflow-y-auto p-4" id="chat-messages">
+            <div class="text-center text-gray-500 py-8">
+                <p>👋 Привет! Я MCP агент для работы с GitHub.</p>
+                <p class="text-sm mt-2">Спросите меня о репозиториях, пользователях или поиске на GitHub!</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input Form -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div class="flex items-center space-x-4">
+            <input class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                   id="message-input"
+                   maxlength="500"
+                   placeholder="Спросите о GitHub репозиториях или пользователях..."
+                   type="text">
+            <button class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    id="send-btn">
+                Отправить
+            </button>
+        </div>
+        <div class="mt-2 flex justify-between items-center text-sm text-gray-500">
+            <div class="space-x-4">
+                <button class="hover:text-purple-600 transition-colors"
+                        onclick="insertExample('Найди популярные репозитории на Kotlin')">
+                    💡 Пример 1
+                </button>
+                <button class="hover:text-purple-600 transition-colors"
+                        onclick="insertExample('Расскажи о пользователе JetBrains')">
+                    💡 Пример 2
+                </button>
+                <button class="hover:text-purple-600 transition-colors"
+                        onclick="insertExample('Покажи мои репозитории')">
+                    💡 Пример 3
+                </button>
+            </div>
+            <button class="hover:text-red-600 transition-colors" id="clear-btn">
+                🗑️ Очистить
+            </button>
+        </div>
+    </div>
+
+    <!-- Available Tools -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h3 class="text-lg font-semibold mb-4">🔧 Доступные инструменты</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="available-tools">
+            <div class="text-center text-gray-500 py-4 col-span-2">
+                Загрузка инструментов...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let sessionId = null;
+    let isLoading = false;
+
+    // Generate session ID
+    function generateSessionId() {
+        return 'session_' + Math.random().toString(36).substr(2, 9);
+    }
+
+    // Initialize session
+    function initializeSession() {
+        sessionId = generateSessionId();
+        document.getElementById('session-id').textContent = sessionId;
+        loadStatus();
+        loadAvailableTools();
+    }
+
+    // Load status information
+    async function loadStatus() {
+        try {
+            const response = await fetch('/mcp/status');
+            const data = await response.json();
+
+            if (response.ok) {
+                document.getElementById('status-indicator').className = 'w-2 h-2 bg-green-400 rounded-full mr-2';
+                document.getElementById('status-text').textContent = 'Connected';
+                document.getElementById('github-status').textContent = data.githubTokenConfigured ? '✅ Configured' : '❌ Not set';
+            } else {
+                document.getElementById('status-indicator').className = 'w-2 h-2 bg-red-400 rounded-full mr-2';
+                document.getElementById('status-text').textContent = 'Error';
+            }
+        } catch (error) {
+            document.getElementById('status-indicator').className = 'w-2 h-2 bg-red-400 rounded-full mr-2';
+            document.getElementById('status-text').textContent = 'Offline';
+        }
+    }
+
+    // Load available tools
+    async function loadAvailableTools() {
+        try {
+            const response = await fetch('/mcp/tools');
+            const data = await response.json();
+
+            const toolsContainer = document.getElementById('available-tools');
+            const toolsCount = document.getElementById('tools-count');
+
+            if (response.ok && data.status === 'connected') {
+                const tools = data.tools || [];
+                toolsCount.textContent = tools.length;
+
+                if (tools.length > 0) {
+                    toolsContainer.innerHTML = tools.map(tool => `
+                        <div class="bg-gray-50 p-3 rounded-lg">
+                            <div class="font-semibold text-gray-800">${tool.name}</div>
+                            <div class="text-sm text-gray-600">${tool.description}</div>
+                        </div>
+                    `).join('');
+                } else {
+                    toolsContainer.innerHTML = '<div class="text-center text-gray-500 col-span-2">Инструменты не найдены</div>';
+                }
+            } else {
+                toolsContainer.innerHTML = '<div class="text-center text-red-500 col-span-2">Ошибка загрузки инструментов</div>';
+                toolsCount.textContent = 'Error';
+            }
+        } catch (error) {
+            document.getElementById('available-tools').innerHTML = '<div class="text-center text-red-500 col-span-2">Ошибка сети</div>';
+            document.getElementById('tools-count').textContent = 'Offline';
+        }
+    }
+
+    // Add message to chat
+    function addMessage(content, type, toolResults = null) {
+        const messagesContainer = document.getElementById('chat-messages');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${type}-message`;
+
+        let messageHTML = `<div class="font-semibold mb-1">${type === 'user' ? '👤 Вы' : '🤖 MCP Agent'}</div>`;
+        messageHTML += `<div>${content}</div>`;
+
+        if (toolResults && toolResults.length > 0) {
+            messageHTML += '<div class="mt-3">';
+            messageHTML += '<div class="text-sm font-semibold text-gray-700 mb-2">🔧 Использованные инструменты:</div>';
+            toolResults.forEach(tool => {
+                messageHTML += `
+                    <div class="tool-result">
+                        <div class="font-semibold">${tool.tool}</div>
+                        <div class="text-xs text-gray-600 mt-1">${tool.result.substring(0, 200)}${tool.result.length > 200 ? '...' : ''}</div>
+                    </div>
+                `;
+            });
+            messageHTML += '</div>';
+        }
+
+        messageDiv.innerHTML = messageHTML;
+        messagesContainer.appendChild(messageDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Show loading message
+    function showLoading() {
+        const messagesContainer = document.getElementById('chat-messages');
+        const loadingDiv = document.createElement('div');
+        loadingDiv.id = 'loading-message';
+        loadingDiv.className = 'message assistant-message';
+        loadingDiv.innerHTML = `
+            <div class="font-semibold mb-1">🤖 MCP Agent</div>
+            <div class="loading-dots">Думаю</div>
+        `;
+        messagesContainer.appendChild(loadingDiv);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+
+    // Hide loading message
+    function hideLoading() {
+        const loadingMessage = document.getElementById('loading-message');
+        if (loadingMessage) {
+            loadingMessage.remove();
+        }
+    }
+
+    // Send message
+    async function sendMessage() {
+        const input = document.getElementById('message-input');
+        const message = input.value.trim();
+
+        if (!message || isLoading) return;
+
+        isLoading = true;
+        const sendBtn = document.getElementById('send-btn');
+        sendBtn.disabled = true;
+
+        addMessage(message, 'user');
+        input.value = '';
+        showLoading();
+
+        try {
+            const response = await fetch('/mcp/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    sessionId: sessionId
+                })
+            });
+
+            const data = await response.json();
+
+            hideLoading();
+
+            if (response.ok) {
+                addMessage(data.response, 'assistant', data.mcpResults);
+            } else {
+                addMessage(`Ошибка: ${data.response || 'Произошла ошибка'}`, 'assistant');
+            }
+        } catch (error) {
+            hideLoading();
+            addMessage(`Ошибка сети: ${error.message}`, 'assistant');
+        } finally {
+            isLoading = false;
+            sendBtn.disabled = false;
+        }
+    }
+
+    // Clear chat
+    async function clearChat() {
+        if (!confirm('Вы уверены, что хотите очистить чат?')) return;
+
+        try {
+            await fetch('/mcp/clear', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    sessionId: sessionId
+                })
+            });
+
+            // Reset session
+            sessionId = generateSessionId();
+            document.getElementById('session-id').textContent = sessionId;
+
+            // Clear messages
+            const messagesContainer = document.getElementById('chat-messages');
+            messagesContainer.innerHTML = `
+                <div class="text-center text-gray-500 py-8">
+                    <p>👋 Привет! Я MCP агент для работы с GitHub.</p>
+                    <p class="text-sm mt-2">Спросите меня о репозиториях, пользователях или поиске на GitHub!</p>
+                </div>
+            `;
+        } catch (error) {
+            console.error('Error clearing chat:', error);
+        }
+    }
+
+    // Insert example text
+    function insertExample(text) {
+        document.getElementById('message-input').value = text;
+        document.getElementById('message-input').focus();
+    }
+
+    // Event listeners
+    document.getElementById('send-btn').addEventListener('click', sendMessage);
+    document.getElementById('message-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+    document.getElementById('clear-btn').addEventListener('click', clearChat);
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initializeSession);
+
+    // Refresh status every 30 seconds
+    setInterval(loadStatus, 30000);
+</script>
+</body>
+</html>
