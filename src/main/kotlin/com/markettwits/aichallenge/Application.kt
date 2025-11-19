@@ -43,9 +43,24 @@ fun main() {
     val repository = ConversationRepository()
     val sessionManager = SessionManager(repository)
 
+    // Initialize reminder services
+    val reminderRepository = ReminderRepository()
+    val reminderScheduler = ReminderScheduler(reminderRepository, repository)
+
+    // Initialize MCP Integration Service
+    val anthropicClient = AnthropicClient(apiKey)
+    val mcpIntegrationService = DemoMcpIntegration(reminderRepository, anthropicClient)
+
     val port = System.getenv("PORT")?.toIntOrNull() ?: 8080
 
     println("Starting server on port $port")
+    println("Initializing reminder services and MCP integration...")
+
+    // Start reminder scheduler in background
+    reminderScheduler.start()
+
+    // MCP integration service ready
+    println("✅ MCP Integration Service initialized successfully")
 
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
@@ -60,10 +75,21 @@ fun main() {
             allowHeader(HttpHeaders.ContentType)
             allowMethod(HttpMethod.Post)
             allowMethod(HttpMethod.Get)
+            allowMethod(HttpMethod.Put)
+            allowMethod(HttpMethod.Delete)
             allowMethod(HttpMethod.Options)
         }
 
-        configureRouting(sessionManager, apiKey, huggingFaceKey, repository)
+        configureRouting(
+            sessionManager,
+            apiKey,
+            huggingFaceKey,
+            repository,
+            reminderRepository,
+            reminderScheduler,
+            mcpIntegrationService,
+            anthropicClient
+        )
 
         routing {
             staticResources("/", "static")
