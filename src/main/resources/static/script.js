@@ -1699,9 +1699,478 @@ document.getElementById('mcp-message-input')?.addEventListener('keypress', (e) =
 });
 document.getElementById('mcp-clear-btn')?.addEventListener('click', clearMcpChat);
 
+// Reminders functionality
+let currentRemindersFilter = 'all';
+let allReminders = [];
+
+// Create reminder function
+async function createReminder() {
+    const title = document.getElementById('reminder-title').value.trim();
+    const description = document.getElementById('reminder-description').value.trim();
+    const priority = document.getElementById('reminder-priority').value;
+    const dueDate = document.getElementById('reminder-due-date').value;
+    const reminderTime = document.getElementById('reminder-time').value;
+    const periodicityMinutes = document.getElementById('reminder-periodicity').value;
+    const recurringType = document.getElementById('reminder-recurring-type').value;
+
+    if (!title || !description) {
+        showNotification('Пожалуйста, введите название и описание задачи', 'error');
+        return;
+    }
+
+    try {
+        const requestBody = {
+            title,
+            description,
+            priority,
+            dueDate: dueDate || null,
+            reminderTime: reminderTime || null
+        };
+
+        // Add periodicity if selected
+        if (periodicityMinutes) {
+            requestBody.periodicityMinutes = parseInt(periodicityMinutes);
+        }
+
+        // Add recurring type if selected
+        if (recurringType) {
+            requestBody.recurringType = recurringType;
+        }
+
+        const response = await fetch('/reminder/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Clear form
+            document.getElementById('reminder-title').value = '';
+            document.getElementById('reminder-description').value = '';
+            document.getElementById('reminder-priority').value = 'medium';
+            document.getElementById('reminder-due-date').value = '';
+            document.getElementById('reminder-time').value = '';
+            document.getElementById('reminder-periodicity').value = '';
+            document.getElementById('reminder-recurring-type').value = '';
+
+            // Show success message
+            const periodText = periodicityMinutes ? ` с периодичностью ${periodicityMinutes} мин` : '';
+            showNotification(`✅ Задача успешно создана${periodText}!`, 'success');
+
+            // Refresh tasks
+            await loadReminders();
+        } else {
+            showNotification('❌ Ошибка: ' + (result.error || 'Неизвестная ошибка'), 'error');
+        }
+    } catch (error) {
+        showNotification('❌ Ошибка при создании задачи: ' + error.message, 'error');
+    }
+}
+
+// Create reminder with AI assistance
+async function createReminderWithAI() {
+    const title = document.getElementById('reminder-title').value.trim();
+    const description = document.getElementById('reminder-description').value.trim();
+    const priority = document.getElementById('reminder-priority').value;
+    const dueDate = document.getElementById('reminder-due-date').value;
+    const reminderTime = document.getElementById('reminder-time').value;
+
+    if (!title || !description) {
+        alert('Пожалуйста, введите название и описание задачи');
+        return;
+    }
+
+    try {
+        // First create the reminder
+        const reminderResponse = await fetch('/reminder/create', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                title,
+                description,
+                priority,
+                dueDate,
+                reminderTime
+            })
+        });
+
+        const reminderResult = await reminderResponse.json();
+
+        if (!reminderResult.success) {
+            throw new Error(reminderResult.error || 'Не удалось создать задачу');
+        }
+
+        // Then get AI enhancement
+        const aiResponse = await fetch('/mcp/demo/execute', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tool: 'reminder_creation',
+                parameters: {
+                    title,
+                    description,
+                    priority
+                }
+            })
+        });
+
+        const aiResult = await aiResponse.json();
+
+        // Show AI response in a nice modal
+        showAIEnhancementModal(aiResult.result);
+
+        // Clear form
+        document.getElementById('reminder-title').value = '';
+        document.getElementById('reminder-description').value = '';
+        document.getElementById('reminder-priority').value = 'medium';
+        document.getElementById('reminder-due-date').value = '';
+        document.getElementById('reminder-time').value = '';
+
+        // Refresh tasks
+        await loadReminders();
+
+    } catch (error) {
+        showNotification('❌ Ошибка: ' + error.message, 'error');
+    }
+}
+
+// Show AI enhancement modal
+function showAIEnhancementModal(aiResponse) {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('ai-enhancement-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'ai-enhancement-modal';
+        modal.className = 'hidden fixed inset-0 modal-backdrop flex items-center justify-center p-4 z-50';
+        modal.innerHTML = `
+            <div class="modal-content rounded-2xl max-w-2xl w-full p-6 max-h-[80vh] overflow-y-auto">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-xl font-bold text-purple-800">🤖 AI Улучшение задачи</h3>
+                    <button onclick="closeAIEnhancementModal()" class="text-gray-500 hover:text-gray-700">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div id="ai-enhancement-content" class="prose prose-sm max-w-none">
+                    Loading AI response...
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    // Set content and show modal
+    document.getElementById('ai-enhancement-content').innerHTML = aiResponse.replace(/\n/g, '<br>');
+    modal.classList.remove('hidden');
+}
+
+// Close AI enhancement modal
+function closeAIEnhancementModal() {
+    const modal = document.getElementById('ai-enhancement-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+// Load reminders from server
+async function loadReminders() {
+    try {
+        const response = await fetch('/reminder/list');
+        const data = await response.json();
+        allReminders = data.tasks || [];
+
+        // Update summary
+        updateRemindersSummary();
+
+        // Display filtered tasks
+        displayFilteredReminders();
+
+    } catch (error) {
+        console.error('Error loading reminders:', error);
+        showNotification('❌ Ошибка загрузки задач: ' + error.message, 'error');
+    }
+}
+
+// Update reminders summary
+function updateRemindersSummary() {
+    const summary = allReminders.reduce((acc, task) => {
+        acc.total++;
+        if (task.status === 'completed') {
+            acc.completed++;
+        } else {
+            acc.pending++;
+        }
+        // Check if overdue (past due date)
+        if (task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed') {
+            acc.overdue++;
+        }
+        return acc;
+    }, {total: 0, completed: 0, pending: 0, overdue: 0});
+
+    document.getElementById('total-tasks').textContent = summary.total;
+    document.getElementById('completed-tasks').textContent = summary.completed;
+    document.getElementById('pending-tasks').textContent = summary.pending;
+    document.getElementById('overdue-tasks').textContent = summary.overdue;
+}
+
+// Display filtered reminders
+function displayFilteredReminders() {
+    const container = document.getElementById('reminders-list');
+
+    let filteredTasks = allReminders;
+    if (currentRemindersFilter !== 'all') {
+        filteredTasks = allReminders.filter(task => {
+            if (currentRemindersFilter === 'completed') {
+                return task.status === 'completed';
+            } else if (currentRemindersFilter === 'pending') {
+                return task.status !== 'completed';
+            }
+            return true;
+        });
+    }
+
+    if (filteredTasks.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-gray-500 py-8">
+                <i class="fas fa-inbox text-4xl mb-2"></i>
+                <p>Нет задач для отображения</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = filteredTasks.map(task => createReminderCard(task)).join('');
+}
+
+// Create reminder card HTML
+function createReminderCard(task) {
+    const priorityColors = {
+        high: 'border-red-500',
+        medium: 'border-yellow-500',
+        low: 'border-green-500'
+    };
+
+    const priorityIcons = {
+        high: '🔴',
+        medium: '🟡',
+        low: '🟢'
+    };
+
+    const statusClass = task.status === 'completed' ? 'opacity-60' : '';
+    const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'completed';
+
+    return `
+        <div class="border-l-4 ${priorityColors[task.priority]} bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow ${statusClass}">
+            <div class="flex items-start justify-between">
+                <div class="flex-1">
+                    <div class="flex items-center mb-2">
+                        <span class="text-lg">${priorityIcons[task.priority]}</span>
+                        <h4 class="font-semibold ml-2 ${task.status === 'completed' ? 'line-through' : ''}">
+                            ${task.title}
+                        </h4>
+                        ${isOverdue ? '<span class="ml-2 text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Просрочена</span>' : ''}
+                    </div>
+                    <p class="text-gray-600 text-sm mb-2">${task.description}</p>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        ${task.dueDate ? `<span class="bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                            <i class="fas fa-calendar mr-1"></i>${new Date(task.dueDate).toLocaleDateString()}
+                        </span>` : ''}
+                        ${task.reminderTime ? `<span class="bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            <i class="fas fa-bell mr-1"></i>${new Date(task.reminderTime).toLocaleTimeString()}
+                        </span>` : ''}
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    ${task.status !== 'completed' ? `
+                        <button onclick="completeReminder('${task.id}')"
+                                class="text-green-600 hover:text-green-800 transition-colors"
+                                title="Отметить как выполнена">
+                            <i class="fas fa-check-circle"></i>
+                        </button>
+                    ` : ''}
+                    <button onclick="deleteReminder('${task.id}')"
+                            class="text-red-600 hover:text-red-800 transition-colors"
+                            title="Удалить задачу">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Complete reminder
+async function completeReminder(taskId) {
+    try {
+        const response = await fetch(`/reminder/${taskId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({status: 'completed'})
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('✅ Задача отмечена как выполнена!', 'success');
+            await loadReminders();
+        } else {
+            showNotification('❌ Ошибка: ' + (result.error || 'Не удалось обновить задачу'), 'error');
+        }
+    } catch (error) {
+        showNotification('❌ Ошибка при обновлении задачи: ' + error.message, 'error');
+    }
+}
+
+// Delete reminder
+async function deleteReminder(taskId) {
+    if (!confirm('Вы уверены, что хотите удалить эту задачу?')) {
+        return;
+    }
+
+    try {
+        const response = await fetch(`/reminder/${taskId}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showNotification('✅ Задача успешно удалена!', 'success');
+            await loadReminders();
+        } else {
+            showNotification('❌ Ошибка: ' + (result.error || 'Не удалось удалить задачу'), 'error');
+        }
+    } catch (error) {
+        showNotification('❌ Ошибка при удалении задачи: ' + error.message, 'error');
+    }
+}
+
+// Filter reminders
+function filterReminders(filter) {
+    currentRemindersFilter = filter;
+
+    // Update button styles
+    document.querySelectorAll('.filter-reminders-btn').forEach(btn => {
+        if (btn.dataset.filter === filter) {
+            btn.className = 'filter-reminders-btn px-3 py-1 rounded-lg text-sm font-medium bg-blue-600 text-white';
+        } else {
+            btn.className = 'filter-reminders-btn px-3 py-1 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300';
+        }
+    });
+
+    displayFilteredReminders();
+}
+
+// Refresh tasks
+async function refreshTasks() {
+    const refreshBtn = event.target;
+    const originalText = refreshBtn.innerHTML;
+
+    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Обновление...';
+    refreshBtn.disabled = true;
+
+    try {
+        await loadReminders();
+        showNotification('🔄 Задачи обновлены!', 'success');
+    } catch (error) {
+        showNotification('❌ Ошибка обновления: ' + error.message, 'error');
+    } finally {
+        refreshBtn.innerHTML = originalText;
+        refreshBtn.disabled = false;
+    }
+}
+
+// Show notification (reuse existing function if available)
+function showNotification(message, type) {
+    // Create notification element if it doesn't exist
+    let notification = document.getElementById('notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'notification';
+        notification.className = 'fixed bottom-4 right-4 max-w-md z-50';
+        notification.innerHTML = `
+            <div class="bg-white rounded-lg shadow-xl p-4 border-l-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <div class="notification-icon text-xl"></div>
+                    </div>
+                    <div class="ml-3">
+                        <div class="notification-message text-sm font-medium text-gray-900"></div>
+                    </div>
+                    <button onclick="hideNotification()" class="ml-auto text-gray-400 hover:text-gray-500">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(notification);
+    }
+
+    const messageEl = notification.querySelector('.notification-message');
+    const iconEl = notification.querySelector('.notification-icon');
+    const borderEl = notification.firstElementChild;
+
+    messageEl.textContent = message;
+
+    if (type === 'success') {
+        iconEl.className = 'notification-icon fas fa-check-circle text-green-500';
+        borderEl.className = 'bg-white rounded-lg shadow-xl p-4 border-l-4 border-green-500';
+    } else {
+        iconEl.className = 'notification-icon fas fa-exclamation-circle text-red-500';
+        borderEl.className = 'bg-white rounded-lg shadow-xl p-4 border-l-4 border-red-500';
+    }
+
+    notification.classList.remove('hidden');
+    notification.classList.add('fade-in');
+
+    // Auto-hide after 5 seconds
+    setTimeout(() => {
+        hideNotification();
+    }, 5000);
+}
+
+function hideNotification() {
+    const notification = document.getElementById('notification');
+    if (notification) {
+        notification.classList.add('hidden');
+    }
+}
+
 // Initialize chat history when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadCoachStyle();
     loadChatHistory(sessionId);
     initializeMcpSession();
+
+    // Add tab switching for reminders
+    const remindersTab = document.getElementById('tab-reminders');
+    if (remindersTab) {
+        remindersTab.addEventListener('click', () => {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active-tab');
+            });
+
+            // Show reminders tab
+            document.getElementById('reminders-content').classList.add('active');
+            remindersTab.classList.add('active-tab');
+
+            // Load reminders when tab is opened
+            loadReminders();
+        });
+    }
 });

@@ -208,3 +208,92 @@ data class McpStatusResponse(
     val githubTokenConfigured: Boolean,
     val error: String? = null,
 )
+
+// Reminder/Task models
+@Serializable
+data class ReminderTask(
+    val id: String,
+    val title: String,
+    val description: String,
+    val priority: String = "medium",
+    val dueDate: String? = null, // оставим для совместимости
+    val reminderTime: String? = null, // оставим для совместимости
+    val status: String = "pending",
+    val createdAt: String,
+    val completedAt: String? = null,
+    val recurringType: String? = null, // daily, weekly, monthly, hourly, minutely, custom
+    val periodicityMinutes: Int? = null, // период в минутах (1=минута, 10=10 минут, 60=час, 1440=день, 10080=неделя)
+    val nextReminderTime: String? = null, // время следующего напоминания
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class ReminderCreateRequest(
+    val title: String,
+    val description: String,
+    val priority: String = "medium",
+    val dueDate: String? = null, // для совместимости
+    val reminderTime: String? = null, // для совместимости
+    val recurringType: String? = null, // daily, weekly, monthly, hourly, minutely, custom
+    val periodicityMinutes: Int? = null, // период в минутах (1=минута, 10=10 минут, 60=час, 1440=день, 10080=неделя)
+    val metadata: Map<String, String> = emptyMap(),
+)
+
+@Serializable
+data class ReminderUpdateRequest(
+    val title: String? = null,
+    val description: String? = null,
+    val priority: String? = null,
+    val dueDate: String? = null,
+    val reminderTime: String? = null,
+    val status: String? = null,
+    val recurringType: String? = null,
+    val periodicityMinutes: Int? = null,
+    val nextReminderTime: String? = null,
+    val metadata: Map<String, String>? = null,
+)
+
+@Serializable
+data class ReminderListResponse(
+    val tasks: List<ReminderTask>,
+    val count: Int,
+    val error: String? = null,
+)
+
+@Serializable
+data class ReminderResponse(
+    val task: ReminderTask,
+    val success: Boolean,
+    val error: String? = null,
+)
+
+@Serializable
+data class ReminderSummary(
+    val date: String,
+    val totalTasks: Int,
+    val completedTasks: Int,
+    val pendingTasks: Int,
+    val overdueTasks: Int,
+    val todayReminders: List<ReminderTask>,
+    val conversationSummary: String? = null,
+)
+
+@Serializable
+data class NotificationRequest(
+    val message: String,
+    val type: String = "info",
+    val timestamp: String,
+    val taskId: String? = null,
+)
+
+@Serializable
+data class NotificationHistoryRecord(
+    val id: Int,
+    val taskId: String,
+    val message: String,
+    val type: String,
+    val timestamp: String,
+    val sent: Boolean,
+)
+
+

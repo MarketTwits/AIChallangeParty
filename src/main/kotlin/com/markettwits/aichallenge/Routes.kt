@@ -1,5 +1,6 @@
 package com.markettwits.aichallenge
 
+import com.markettwits.aichallenge.DemoMcpIntegration.*
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -14,16 +15,24 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import org.slf4j.LoggerFactory
+import java.time.format.DateTimeFormatter
 
 fun Application.configureRouting(
     sessionManager: SessionManager,
     apiKey: String,
     huggingFaceKey: String,
     repository: ConversationRepository,
+    reminderRepository: ReminderRepository,
+    reminderScheduler: ReminderScheduler,
+    mcpIntegrationService: DemoMcpIntegration,
+    anthropicClient: AnthropicClient,
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
     val mcpAgents = mutableMapOf<String, McpAgent>()
+    val reminderMcpServer = ReminderMcpServer(reminderRepository)
+    // val llmSummarizer = AdvancedLLMSummarizer(anthropicClient, reminderRepository, repository)
+    // val realMcpDemo = RealMcpDemo(reminderRepository, anthropicClient)
 
     val hfKeyMasked = if (huggingFaceKey.length > 8) {
         "${huggingFaceKey.substring(0, 8)}...${huggingFaceKey.substring(huggingFaceKey.length - 4)}"
@@ -428,6 +437,468 @@ fun Application.configureRouting(
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     McpStatusResponse(status = "error", activeSessions = 0, githubTokenConfigured = false)
+                )
+            }
+        }
+
+        // Reminder MCP endpoints
+        get("/reminder/mcp/tools") {
+            try {
+                val tools = reminderMcpServer.getAvailableTools()
+
+                val response = McpToolsResponse(
+                    tools = tools.map { tool ->
+                        McpToolResponse(
+                            name = tool.name,
+                            description = tool.description,
+                            inputSchema = tool.input_schema.properties
+                        )
+                    },
+                    count = tools.size,
+                    status = "connected"
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                logger.error("Error getting reminder MCP tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    McpToolsResponse(
+                        tools = emptyList(),
+                        count = 0,
+                        status = "error",
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        post("/reminder/mcp/execute") {
+            try {
+                val request = call.receive<GitHubExecuteRequest>() // Reusing the same request model
+
+                val result = reminderMcpServer.executeTool(request.tool, request.parameters)
+
+                call.respond(
+                    HttpStatusCode.OK, GitHubExecuteResponse(
+                        tool = request.tool,
+                        result = result,
+                        success = true
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error executing reminder MCP tool", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    GitHubExecuteResponse(
+                        tool = "",
+                        result = "",
+                        success = false,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        // Direct Reminder API endpoints
+        post("/reminder/create") {
+            try {
+                val request = call.receive<ReminderCreateRequest>()
+                val task = reminderRepository.createReminder(request)
+
+                call.respond(
+                    HttpStatusCode.Created, ReminderResponse(
+                        task = task,
+                        success = true
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error creating reminder", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ReminderResponse(
+                        task = ReminderTask(
+                            id = "",
+                            title = "",
+                            description = "",
+                            createdAt = ""
+                        ),
+                        success = false,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        get("/reminder/list") {
+            try {
+                val status = call.request.queryParameters["status"] ?: "all"
+                val priority = call.request.queryParameters["priority"]
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
+
+                val reminders = when (status) {
+                    "pending" -> reminderRepository.getPendingReminders()
+                    "completed" -> reminderRepository.getRemindersByStatus("completed")
+                    else -> reminderRepository.getAllReminders()
+                }
+
+                val filteredReminders = if (priority != null) {
+                    reminders.filter { it.priority == priority }
+                } else {
+                    reminders
+                }.take(limit)
+
+                call.respond(
+                    HttpStatusCode.OK, ReminderListResponse(
+                        tasks = filteredReminders,
+                        count = filteredReminders.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error listing reminders", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ReminderListResponse(
+                        tasks = emptyList(),
+                        count = 0,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        get("/reminder/{id}") {
+            try {
+                val id = call.parameters["id"] ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Reminder ID is required")
+                )
+
+                val reminder = reminderRepository.getReminder(id)
+                if (reminder != null) {
+                    call.respond(
+                        HttpStatusCode.OK, ReminderResponse(
+                            task = reminder,
+                            success = true
+                        )
+                    )
+                } else {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ReminderResponse(
+                            task = ReminderTask(
+                                id = "",
+                                title = "",
+                                description = "",
+                                createdAt = ""
+                            ),
+                            success = false,
+                            error = "Reminder not found"
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                logger.error("Error getting reminder", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ReminderResponse(
+                        task = ReminderTask(
+                            id = "",
+                            title = "",
+                            description = "",
+                            createdAt = ""
+                        ),
+                        success = false,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        put("/reminder/{id}") {
+            try {
+                val id = call.parameters["id"] ?: return@put call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Reminder ID is required")
+                )
+
+                val request = call.receive<ReminderUpdateRequest>()
+                val updatedTask = reminderRepository.updateReminder(id, request)
+
+                if (updatedTask != null) {
+                    call.respond(
+                        HttpStatusCode.OK, ReminderResponse(
+                            task = updatedTask,
+                            success = true
+                        )
+                    )
+                } else {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        ReminderResponse(
+                            task = ReminderTask(
+                                id = "",
+                                title = "",
+                                description = "",
+                                createdAt = ""
+                            ),
+                            success = false,
+                            error = "Reminder not found"
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                logger.error("Error updating reminder", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ReminderResponse(
+                        task = ReminderTask(
+                            id = "",
+                            title = "",
+                            description = "",
+                            createdAt = ""
+                        ),
+                        success = false,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        delete("/reminder/{id}") {
+            try {
+                val id = call.parameters["id"] ?: return@delete call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Reminder ID is required")
+                )
+
+                val deleted = reminderRepository.deleteReminder(id)
+                if (deleted) {
+                    call.respond(HttpStatusCode.OK, mapOf("success" to true, "message" to "Reminder deleted"))
+                } else {
+                    call.respond(
+                        HttpStatusCode.NotFound,
+                        mapOf("success" to false, "error" to "Reminder not found")
+                    )
+                }
+            } catch (e: Exception) {
+                logger.error("Error deleting reminder", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
+                )
+            }
+        }
+
+        get("/reminder/today") {
+            try {
+                val todayReminders = reminderRepository.getTodayReminders()
+                call.respond(
+                    HttpStatusCode.OK, ReminderListResponse(
+                        tasks = todayReminders,
+                        count = todayReminders.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting today reminders", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ReminderListResponse(
+                        tasks = emptyList(),
+                        count = 0,
+                        error = e.message
+                    )
+                )
+            }
+        }
+
+        get("/reminder/summary") {
+            try {
+                val summary = reminderRepository.getReminderSummary()
+                call.respond(HttpStatusCode.OK, summary)
+            } catch (e: Exception) {
+                logger.error("Error getting reminder summary", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/reminder/notifications") {
+            try {
+                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
+                val notifications = reminderRepository.getRecentNotifications(limit)
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "notifications" to notifications,
+                        "count" to notifications.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting notifications", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message, "notifications" to emptyList<Any>())
+                )
+            }
+        }
+
+        post("/reminder/summary/send") {
+            try {
+                val request = call.receive<Map<String, String>>()
+                val type = request["type"] ?: "daily"
+
+                val result = reminderScheduler.sendManualSummary(type)
+                call.respond(HttpStatusCode.OK, mapOf("success" to true, "message" to result))
+            } catch (e: Exception) {
+                logger.error("Error sending manual summary", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
+                )
+            }
+        }
+
+        // Real MCP Integration endpoints
+        get("/mcp-integration/status") {
+            try {
+                val status = mcpIntegrationService.getServiceStatus()
+                call.respond(HttpStatusCode.OK, status)
+            } catch (e: Exception) {
+                logger.error("Error getting MCP integration status", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/mcp-integration/execute") {
+            try {
+                val request = call.receive<Map<String, Any>>()
+                val toolName = request["toolName"]?.toString() ?: return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "toolName is required")
+                )
+                val arguments = request["arguments"] as? Map<String, Any> ?: emptyMap()
+
+                val demoRequest = DemoRequest(tool = toolName, parameters = arguments.mapValues { it.value.toString() })
+                val result = mcpIntegrationService.executeDemoRequest(demoRequest)
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "success" to true,
+                        "tool" to toolName,
+                        "result" to result
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error executing MCP tool", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
+                )
+            }
+        }
+
+        get("/mcp-integration/tools") {
+            try {
+                val tools = mcpIntegrationService.getAvailableTools()
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "tools" to tools,
+                        "count" to tools.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting MCP tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message, "tools" to emptyList<String>())
+                )
+            }
+        }
+
+        post("/ai/summary") {
+            try {
+                val request = call.receive<Map<String, String>>()
+                val focus = request["focus"]
+
+                val demoRequest =
+                    DemoRequest(tool = "ai_task_assistant", parameters = mapOf("query" to (focus ?: "general summary")))
+                val summary = mcpIntegrationService.executeDemoRequest(demoRequest)
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "success" to true,
+                        "summary" to summary,
+                        "timestamp" to java.time.Instant.now().toString()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error generating AI summary", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
+                )
+            }
+        }
+
+        post("/mcp/demo/execute") {
+            try {
+                val request = call.receive<DemoRequest>()
+
+                val result = mcpIntegrationService.executeDemoRequest(request)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error executing MCP demo tool", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    DemoResponse(
+                        success = false,
+                        result = "Error: ${e.message}"
+                    )
+                )
+            }
+        }
+
+        get("/mcp/demo/tools") {
+            try {
+                val toolsResponse = mcpIntegrationService.getToolsResponse()
+                call.respond(HttpStatusCode.OK, toolsResponse)
+            } catch (e: Exception) {
+                logger.error("Error getting MCP demo tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    ToolsResponse(
+                        tools = emptyList(),
+                        count = 0,
+                        description = "Error occurred",
+                        powered_by = "Unknown"
+                    )
+                )
+            }
+        }
+
+        post("/ai/daily-summary") {
+            try {
+                val date = call.receive<Map<String, String>>()["date"] ?: java.time.LocalDateTime.now()
+                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
+
+                // Generate comprehensive daily summary using LLM
+                // val dailySummary = llmSummarizer.generateDailySummary(date)
+
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "success" to true,
+                        "message" to "Daily summary feature temporarily disabled",
+                        "date" to date
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error generating daily summary", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
                 )
             }
         }

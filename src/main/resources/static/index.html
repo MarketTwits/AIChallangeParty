@@ -477,6 +477,7 @@
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
                     <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
                     <button class="nav-link text-sm font-medium" id="tab-mcp">MCP Agent</button>
+                    <button class="nav-link text-sm font-medium" id="tab-reminders">📋 Задачи</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
                     <a href="https://sportsauce.ru/starts" target="_blank" class="nav-link text-sm font-medium">Старты</a>
@@ -1076,6 +1077,155 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="mcp-available-tools">
                             <div class="text-center text-gray-500 py-4 col-span-2">
                                 Загрузка инструментов...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Reminders Tab -->
+            <div class="tab-content" id="reminders-content">
+                <div class="chat-container p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">📋 Управление задачами с
+                        AI</h2>
+                    <p class="text-gray-600 mb-6">24/7 система управления задачами с AI-ассистентом и MCP
+                        интеграцией</p>
+
+                    <!-- Task Summary -->
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm" id="reminders-summary">
+                            <div class="text-center">
+                                <div class="font-semibold text-blue-700">Всего задач</div>
+                                <div class="text-gray-700 font-bold text-xl" id="total-tasks">...</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-semibold text-green-700">Выполнено</div>
+                                <div class="text-gray-700 font-bold text-xl" id="completed-tasks">...</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-semibold text-yellow-700">Активные</div>
+                                <div class="text-gray-700 font-bold text-xl" id="pending-tasks">...</div>
+                            </div>
+                            <div class="text-center">
+                                <div class="font-semibold text-red-700">Просрочено</div>
+                                <div class="text-gray-700 font-bold text-xl" id="overdue-tasks">...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Task Creation Form -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-4">➕ Создать новую задачу</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Название задачи *</label>
+                                <input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="reminder-title" placeholder="Введите название задачи"
+                                       required
+                                       type="text">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Приоритет</label>
+                                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        id="reminder-priority">
+                                    <option value="low">🟢 Низкий</option>
+                                    <option selected value="medium">🟡 Средний</option>
+                                    <option value="high">🔴 Высокий</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Описание *</label>
+                            <textarea class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="reminder-description" placeholder="Опишите задачу подробнее"
+                                      required
+                                      rows="2"></textarea>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Срок выполнения</label>
+                                <input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="reminder-due-date"
+                                       type="datetime-local">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Периодичность</label>
+                                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        id="reminder-periodicity">
+                                    <option value="">Нет</option>
+                                    <option value="1">Каждую минуту</option>
+                                    <option value="5">Каждые 5 минут</option>
+                                    <option value="10">Каждые 10 минут</option>
+                                    <option value="15">Каждые 15 минут</option>
+                                    <option value="30">Каждые 30 минут</option>
+                                    <option value="60">Каждый час</option>
+                                    <option value="120">Каждые 2 часа</option>
+                                    <option value="240">Каждые 4 часа</option>
+                                    <option value="720">Каждые 12 часов</option>
+                                    <option value="1440">Каждый день</option>
+                                    <option value="10080">Каждую неделю</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Напоминание
+                                    (опционально)</label>
+                                <input class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" id="reminder-time"
+                                       type="datetime-local">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Тип повтора
+                                    (опционально)</label>
+                                <select class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        id="reminder-recurring-type">
+                                    <option value="">Нет</option>
+                                    <option value="minutely">Каждую минуту</option>
+                                    <option value="hourly">Каждый час</option>
+                                    <option value="daily">Каждый день</option>
+                                    <option value="weekly">Каждую неделю</option>
+                                    <option value="monthly">Каждый месяц</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="flex space-x-4">
+                            <button class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                                    onclick="createReminder()">
+                                <i class="fas fa-plus mr-2"></i>Создать задачу
+                            </button>
+                            <button class="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2 rounded-lg transition-colors"
+                                    onclick="createReminderWithAI()">
+                                <i class="fas fa-robot mr-2"></i>Создать с AI
+                            </button>
+                            <button class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg transition-colors"
+                                    onclick="refreshTasks()">
+                                <i class="fas fa-sync mr-2"></i>Обновить
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Tasks List -->
+                    <div class="bg-white border border-gray-200 rounded-lg p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">📋 Список задач</h3>
+                            <div class="flex space-x-2">
+                                <button class="filter-reminders-btn px-3 py-1 rounded-lg text-sm font-medium bg-blue-600 text-white"
+                                        data-filter="all"
+                                        onclick="filterReminders('all')">
+                                    Все
+                                </button>
+                                <button class="filter-reminders-btn px-3 py-1 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                        data-filter="pending"
+                                        onclick="filterReminders('pending')">
+                                    Активные
+                                </button>
+                                <button class="filter-reminders-btn px-3 py-1 rounded-lg text-sm font-medium bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                        data-filter="completed"
+                                        onclick="filterReminders('completed')">
+                                    Выполненные
+                                </button>
+                            </div>
+                        </div>
+                        <div class="space-y-3 max-h-96 overflow-y-auto" id="reminders-list">
+                            <div class="text-center text-gray-500 py-8">
+                                <i class="fas fa-spinner fa-spin text-2xl"></i>
+                                <p class="mt-2">Загрузка задач...</p>
                             </div>
                         </div>
                     </div>
