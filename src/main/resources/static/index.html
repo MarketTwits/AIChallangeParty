@@ -477,6 +477,7 @@
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
                     <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
                     <button class="nav-link text-sm font-medium" id="tab-mcp">MCP Agent</button>
+                    <button class="nav-link text-sm font-medium" id="tab-composition">🔗 MCP Композиция</button>
                     <button class="nav-link text-sm font-medium" id="tab-reminders">📋 Задачи</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
@@ -1077,6 +1078,208 @@
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="mcp-available-tools">
                             <div class="text-center text-gray-500 py-4 col-span-2">
                                 Загрузка инструментов...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- MCP Composition Tab -->
+            <div class="tab-content" id="composition-content">
+                <div class="chat-container p-6 mb-8">
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🔗 MCP Композиция
+                        инструментов</h2>
+                    <p class="text-gray-600 mb-6">Интеллектуальная система для каскадных вызовов MCP инструментов: поиск
+                        → суммаризация → сохранение</p>
+
+                    <!-- Tools Overview -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
+                            <i class="fas fa-tools mr-2"></i>Доступные инструменты
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
+                                <div class="flex items-center mb-3">
+                                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+                                        <i class="fas fa-search text-white"></i>
+                                    </div>
+                                    <h4 class="font-semibold text-gray-800">search_docs</h4>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">Поиск текста в документации и исходном коде</p>
+                                <div class="text-xs text-gray-500">
+                                    Параметры: query, path, file_types, max_results
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+                                <div class="flex items-center mb-3">
+                                    <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+                                        <i class="fas fa-compress-alt text-white"></i>
+                                    </div>
+                                    <h4 class="font-semibold text-gray-800">summarize</h4>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">Суммаризация текста с использованием AI</p>
+                                <div class="text-xs text-gray-500">
+                                    Параметры: text, style, max_length, language
+                                </div>
+                            </div>
+
+                            <div class="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
+                                <div class="flex items-center mb-3">
+                                    <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+                                        <i class="fas fa-save text-white"></i>
+                                    </div>
+                                    <h4 class="font-semibold text-gray-800">save_to_file</h4>
+                                </div>
+                                <p class="text-sm text-gray-600 mb-2">Сохранение контента в файл</p>
+                                <div class="text-xs text-gray-500">
+                                    Параметры: content, file_path, create_dirs, append
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Example Requests -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
+                            <i class="fas fa-lightbulb mr-2"></i>Примеры запросов
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
+                                    onclick="setCompositionExample('Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл architecture_summary.txt')">
+                                <div class="font-semibold mb-1 text-gray-800">📋 Анализ архитектуры</div>
+                                <div class="text-sm text-gray-600">Поиск → Суммаризация → Сохранение</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
+                                    onclick="setCompositionExample('Найди все задачи в проекте, определи критичные и создай отчет critical_tasks.md')">
+                                <div class="font-semibold mb-1 text-gray-800">🎯 Анализ задач</div>
+                                <div class="text-sm text-gray-600">Поиск → Фильтрация → Сохранение</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
+                                    onclick="setCompositionExample('Проанализируй файлы README этого проекта и создай краткое описание functionality.md')">
+                                <div class="font-semibold mb-1 text-gray-800">📖 Документация проекта</div>
+                                <div class="text-sm text-gray-600">Поиск → Анализ → Сохранение</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
+                                    onclick="setCompositionExample('Найди информацию о запуске проекта и создай инструкции setup_guide.md')">
+                                <div class="font-semibold mb-1 text-gray-800">🚀 Инструкция по установке</div>
+                                <div class="text-sm text-gray-600">Поиск → Суммаризация → Сохранение</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- GitHub Repository Analysis -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
+                            <i class="fab fa-github mr-2"></i>Анализ GitHub репозиториев
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
+                                    onclick="setCompositionExample('Создай полный отчет о репозитории microsoft/vscode в HTML формате, включая структуру файлов, коммиты и issues')">
+                                <div class="font-semibold mb-1 text-gray-800">🔍 Полный анализ репозитория</div>
+                                <div class="text-sm text-gray-600">GitHub анализ → HTML отчет</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
+                                    onclick="setCompositionExample('Проанализируй репозиторий facebook/react, найди основные языки программирования и создай краткий отчет в Markdown')">
+                                <div class="font-semibold mb-1 text-gray-800">📊 Анализ технологий</div>
+                                <div class="text-sm text-gray-600">GitHub анализ → Markdown отчет</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
+                                    onclick="setCompositionExample('Изучи активность коммитов в репозитории torvalds/linux за последние 100 коммитов и создай JSON отчет')">
+                                <div class="font-semibold mb-1 text-gray-800">📈 Активность разработки</div>
+                                <div class="text-sm text-gray-600">GitHub коммиты → JSON отчет</div>
+                            </button>
+                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
+                                    onclick="setCompositionExample('Проанализируй issues в репозитории rails/rails, определи приоритеты и создай отчет в Markdown')">
+                                <div class="font-semibold mb-1 text-gray-800">🐛 Анализ проблем</div>
+                                <div class="text-sm text-gray-600">GitHub issues → Markdown отчет</div>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Request Form -->
+                    <div class="mb-8">
+                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
+                            <i class="fas fa-terminal mr-2"></i>Выполнить композицию
+                        </h3>
+                        <div class="bg-white border border-gray-200 rounded-lg p-6">
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">
+                                    Ваш запрос:
+                                </label>
+                                <textarea
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                        id="composition-request-input"
+                                        placeholder="Например: Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл"
+                                        rows="3"></textarea>
+                            </div>
+                            <div class="flex items-center space-x-4">
+                                <button
+                                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all flex items-center space-x-2"
+                                        id="composition-execute-btn"
+                                        onclick="executeComposition()">
+                                    <i class="fas fa-play"></i>
+                                    <span id="composition-execute-text">Выполнить</span>
+                                </button>
+                                <button
+                                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-lg font-medium transition-all"
+                                        onclick="clearCompositionResults()">
+                                    <i class="fas fa-eraser mr-2"></i>Очистить
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loading State -->
+                    <div class="hidden mb-8" id="composition-loading">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                            <div class="text-blue-600">
+                                <i class="fas fa-cog fa-spin text-3xl mb-4"></i>
+                                <div class="text-lg font-semibold mb-2">Выполняю композицию инструментов...</div>
+                                <div class="text-sm">Анализирую запрос и создаю план выполнения</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div class="hidden space-y-6" id="composition-results">
+                        <!-- Plan -->
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
+                                <i class="fas fa-clipboard-list mr-2 text-blue-600"></i>План выполнения
+                            </h3>
+                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div class="text-gray-700 mb-3 font-medium" id="composition-plan-description"></div>
+                                <div class="space-y-2" id="composition-plan-steps"></div>
+                            </div>
+                        </div>
+
+                        <!-- Execution Results -->
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
+                                <i class="fas fa-tasks mr-2 text-green-600"></i>Результаты выполнения
+                            </h3>
+                            <div class="space-y-3" id="composition-execution-results"></div>
+                        </div>
+
+                        <!-- Final Output -->
+                        <div>
+                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
+                                <i class="fas fa-file-alt mr-2 text-purple-600"></i>Финальный результат
+                            </h3>
+                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                <pre class="text-gray-700 whitespace-pre-wrap font-mono text-sm"
+                                     id="composition-final-output"></pre>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Error State -->
+                    <div class="hidden mb-8" id="composition-error">
+                        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
+                            <div class="text-red-700">
+                                <i class="fas fa-exclamation-triangle text-2xl mb-3"></i>
+                                <div class="text-lg font-semibold mb-2">Ошибка выполнения</div>
+                                <div class="text-sm" id="composition-error-message"></div>
                             </div>
                         </div>
                     </div>
