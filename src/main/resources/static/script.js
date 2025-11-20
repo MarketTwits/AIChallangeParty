@@ -2147,6 +2147,146 @@ function hideNotification() {
     }
 }
 
+// MCP Composition Functions
+function setCompositionExample(request) {
+    document.getElementById('composition-request-input').value = request;
+}
+
+function showCompositionLoading() {
+    document.getElementById('composition-loading').classList.remove('hidden');
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+
+    const executeBtn = document.getElementById('composition-execute-btn');
+    const executeText = document.getElementById('composition-execute-text');
+    executeBtn.disabled = true;
+    executeText.textContent = 'Выполнение...';
+}
+
+function hideCompositionLoading() {
+    document.getElementById('composition-loading').classList.add('hidden');
+
+    const executeBtn = document.getElementById('composition-execute-btn');
+    const executeText = document.getElementById('composition-execute-text');
+    executeBtn.disabled = false;
+    executeText.textContent = 'Выполнить';
+}
+
+function showCompositionResults(result) {
+    document.getElementById('composition-results').classList.remove('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+
+    // Display plan
+    const planDescription = document.getElementById('composition-plan-description');
+    const planSteps = document.getElementById('composition-plan-steps');
+
+    planDescription.textContent = result.plan.description;
+    planSteps.innerHTML = '';
+
+    result.plan.steps.forEach((step, index) => {
+        const stepElement = document.createElement('div');
+        stepElement.className = 'flex items-center text-gray-700 text-sm p-3 bg-white rounded-lg border border-gray-200';
+        stepElement.innerHTML = `
+            <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 text-xs font-semibold">
+                ${index + 1}
+            </span>
+            <div class="flex-1">
+                <div class="font-medium text-gray-800">${step.toolName}</div>
+                <div class="text-gray-600 text-xs">${step.description}</div>
+                ${step.outputVariable ? `<div class="text-blue-600 text-xs mt-1">Переменная: ${step.outputVariable}</div>` : ''}
+            </div>
+        `;
+        planSteps.appendChild(stepElement);
+    });
+
+    // Display execution results
+    const executionResults = document.getElementById('composition-execution-results');
+    executionResults.innerHTML = '';
+
+    result.executionResults.forEach((result, index) => {
+        const resultElement = document.createElement('div');
+        const isSuccess = result.success;
+
+        resultElement.className = `p-4 rounded-lg border ${
+            isSuccess
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
+        }`;
+
+        resultElement.innerHTML = `
+            <div class="flex items-start">
+                <div class="mr-3">
+                    <i class="fas ${isSuccess ? 'fa-check-circle text-green-600' : 'fa-exclamation-circle text-red-600'} text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-semibold mb-1 ${isSuccess ? 'text-green-800' : 'text-red-800'}">
+                        ${result.step.description}
+                    </div>
+                    <div class="text-sm ${isSuccess ? 'text-green-700' : 'text-red-700'}">
+                        <strong>Инструмент:</strong> ${result.step.toolName}
+                        <span class="ml-2">(${result.executionTimeMs}ms)</span>
+                    </div>
+                    ${result.step.outputVariable ? `<div class="text-xs ${isSuccess ? 'text-green-600' : 'text-red-600'}"><strong>Переменная:</strong> ${result.step.outputVariable}</div>` : ''}
+                    ${!isSuccess ? `<div class="text-sm text-red-600 mt-1"><strong>Ошибка:</strong> ${result.error}</div>` : ''}
+                </div>
+            </div>
+        `;
+
+        executionResults.appendChild(resultElement);
+    });
+
+    // Display final output
+    const finalOutput = document.getElementById('composition-final-output');
+    finalOutput.textContent = result.finalOutput;
+}
+
+function showCompositionError(errorMessage) {
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.remove('hidden');
+    document.getElementById('composition-error-message').textContent = errorMessage;
+}
+
+function clearCompositionResults() {
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+    document.getElementById('composition-loading').classList.add('hidden');
+    document.getElementById('composition-request-input').value = '';
+}
+
+async function executeComposition() {
+    const request = document.getElementById('composition-request-input').value.trim();
+    if (!request) {
+        alert('Пожалуйста, введите запрос для выполнения композиции');
+        return;
+    }
+
+    showCompositionLoading();
+
+    try {
+        const response = await fetch('/mcp/composition', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({request})
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ошибка выполнения запроса');
+        }
+
+        const result = await response.json();
+        showCompositionResults(result);
+
+    } catch (error) {
+        console.error('Error executing composition:', error);
+        showCompositionError(error.message);
+    } finally {
+        hideCompositionLoading();
+    }
+}
+
 // Initialize chat history when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadCoachStyle();
@@ -2171,6 +2311,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Load reminders when tab is opened
             loadReminders();
+        });
+    }
+
+    // Add tab switching for composition
+    const compositionTab = document.getElementById('tab-composition');
+    if (compositionTab) {
+        compositionTab.addEventListener('click', () => {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active-tab');
+            });
+
+            // Show composition tab
+            document.getElementById('composition-content').classList.add('active');
+            compositionTab.classList.add('active-tab');
         });
     }
 });
