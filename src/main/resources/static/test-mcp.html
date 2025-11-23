@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Test MCP Loading</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .badge-github {
+            background: #24292e;
+            color: white;
+        }
+
+        .badge-reminders {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .badge-files {
+            background: #10b981;
+            color: white;
+        }
+    </style>
+</head>
+<body class="p-8 bg-gray-50">
+<h1 class="text-2xl font-bold mb-4">🧪 Test MCP Data Loading</h1>
+
+<div class="mb-4">
+    <button class="bg-blue-500 text-white px-4 py-2 rounded mr-2" id="test-servers">
+        Test Load Servers
+    </button>
+    <button class="bg-green-500 text-white px-4 py-2 rounded" id="test-tools">
+        Test Load Tools
+    </button>
+</div>
+
+<div class="grid grid-cols-2 gap-4">
+    <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-bold mb-2">📡 MCP Servers</h2>
+        <div id="servers-container">
+            <p class="text-gray-500">Click "Test Load Servers"</p>
+        </div>
+    </div>
+
+    <div class="bg-white p-4 rounded shadow">
+        <h2 class="font-bold mb-2">🛠️ Tools</h2>
+        <div id="tools-container">
+            <p class="text-gray-500">Click "Test Load Tools"</p>
+        </div>
+    </div>
+</div>
+
+<div class="mt-4 bg-gray-800 text-green-400 p-4 rounded font-mono text-sm">
+    <div id="console-log"></div>
+</div>
+
+<script>
+    const consoleLog = document.getElementById('console-log');
+
+    function log(message) {
+        console.log(message);
+        const p = document.createElement('p');
+        p.textContent = `> ${message}`;
+        consoleLog.appendChild(p);
+        consoleLog.scrollTop = consoleLog.scrollHeight;
+    }
+
+    document.getElementById('test-servers').addEventListener('click', async () => {
+        log('Fetching servers from /api/orchestration/servers...');
+        try {
+            const response = await fetch('/api/orchestration/servers');
+            log(`Response status: ${response.status}`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            log(`Received ${data.totalServers} servers`);
+
+            const container = document.getElementById('servers-container');
+            container.innerHTML = data.servers.map(server => `
+                    <div class="mb-2 p-2 bg-gray-50 rounded">
+                        <div class="flex justify-between items-center">
+                            <span class="font-semibold">${server.serverName}</span>
+                            <span class="badge badge-${server.serverId}">${server.serverId}</span>
+                        </div>
+                        <div class="text-xs text-gray-600 mt-1">
+                            <div>Version: ${server.version}</div>
+                            <div>Tools: ${server.toolCount}</div>
+                            <div>State: <span class="${server.state === 'READY' ? 'text-green-600' : 'text-red-600'}">${server.state}</span></div>
+                        </div>
+                    </div>
+                `).join('');
+
+            log('✅ Servers loaded successfully!');
+        } catch (error) {
+            log(`❌ Error: ${error.message}`);
+            document.getElementById('servers-container').innerHTML =
+                `<p class="text-red-500">Error: ${error.message}</p>`;
+        }
+    });
+
+    document.getElementById('test-tools').addEventListener('click', async () => {
+        log('Fetching tools from /api/orchestration/tools...');
+        try {
+            const response = await fetch('/api/orchestration/tools');
+            log(`Response status: ${response.status}`);
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+
+            const data = await response.json();
+            log(`Received ${data.totalTools} tools`);
+
+            const container = document.getElementById('tools-container');
+            container.innerHTML = data.tools.slice(0, 10).map(tool => `
+                    <div class="mb-2 p-2 bg-gray-50 rounded">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1">
+                                <div class="font-semibold text-sm">${tool.name}</div>
+                                <div class="text-xs text-gray-600">${tool.description}</div>
+                            </div>
+                            <span class="badge badge-${tool.serverId} ml-2">${tool.serverId}</span>
+                        </div>
+                    </div>
+                `).join('');
+
+            if (data.totalTools > 10) {
+                container.innerHTML += `<p class="text-xs text-gray-500 mt-2">... and ${data.totalTools - 10} more tools</p>`;
+            }
+
+            log('✅ Tools loaded successfully!');
+        } catch (error) {
+            log(`❌ Error: ${error.message}`);
+            document.getElementById('tools-container').innerHTML =
+                `<p class="text-red-500">Error: ${error.message}</p>`;
+        }
+    });
+
+    log('Test page loaded. Click buttons to test API endpoints.');
+</script>
+</body>
+</html>

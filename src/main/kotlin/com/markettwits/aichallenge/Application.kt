@@ -1,5 +1,6 @@
 package com.markettwits.aichallenge
 
+import com.markettwits.aichallenge.mcp.configureOrchestrationRoutes
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
@@ -89,6 +90,12 @@ fun main() {
             reminderScheduler,
             mcpIntegrationService,
             anthropicClient
+        )
+
+        // Configure MCP Orchestration routes (Day 14)
+        configureOrchestrationRoutes(
+            anthropicClient,
+            reminderRepository
         )
 
         routing {
