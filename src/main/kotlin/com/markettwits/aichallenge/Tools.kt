@@ -12,7 +12,9 @@ object Tools {
             getGitHubSearchTool(),
             getGitHubRepositoryTool(),
             getGitHubUserRepositoriesTool(),
-            getGitHubUserInfoTool()
+            getGitHubUserInfoTool(),
+            // Добавляем инструменты композиции
+            *CompositionMcpTools.getAllCompositionTools().toTypedArray()
         )
     }
 
@@ -119,8 +121,15 @@ object Tools {
         )
     }
 
-    fun executeTool(toolName: String, input: JsonObject): String {
+    suspend fun executeTool(toolName: String, input: JsonObject): String {
         return try {
+            // Проверяем сначала инструменты композиции
+            val compositionResult = CompositionMcpTools.executeCompositionTool(toolName, input)
+            if (!compositionResult.startsWith("Unknown composition tool")) {
+                return compositionResult
+            }
+
+            // Затем существующие инструменты
             when (toolName) {
                 "assess_fitness_level" -> executeAssessFitnessLevel(input)
                 "generate_training_plan" -> executeGenerateTrainingPlan(input)
