@@ -15,6 +15,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import org.slf4j.LoggerFactory
+import java.io.File
 import java.time.format.DateTimeFormatter
 
 fun Application.configureRouting(
@@ -900,6 +901,74 @@ fun Application.configureRouting(
                     HttpStatusCode.InternalServerError,
                     mapOf("success" to false, "error" to e.message)
                 )
+            }
+        }
+
+        // MCP Tool Composition endpoints
+        post("/mcp/composition") {
+            try {
+                val request = call.receive<Map<String, String>>()
+                val compositionRequest = request["request"] ?: return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "request parameter is required")
+                )
+
+                logger.info("Received composition request: $compositionRequest")
+
+                val compositionAgent = CompositionAgent(anthropicClient)
+                val result = compositionAgent.executeComposition(compositionRequest)
+
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error executing composition", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("success" to false, "error" to e.message)
+                )
+            }
+        }
+
+        get("/mcp/composition/tools") {
+            try {
+                val tools = CompositionMcpTools.getAllCompositionTools()
+                val toolsList = tools.map { tool ->
+                    mapOf(
+                        "name" to tool.name,
+                        "description" to tool.description
+                    )
+                }
+                call.respond(
+                    HttpStatusCode.OK, mapOf(
+                        "tools" to toolsList,
+                        "count" to toolsList.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting composition tools", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message, "tools" to emptyList<String>())
+                )
+            }
+        }
+
+        // Download report files
+        get("/download/{filename}") {
+            val filename = call.parameters["filename"]
+                ?: return@get call.respondText("Filename is required", status = HttpStatusCode.BadRequest)
+
+            val file = File("reports/$filename")
+            if (file.exists()) {
+                call.response.header(
+                    HttpHeaders.ContentDisposition,
+                    ContentDisposition.Attachment.withParameter(
+                        ContentDisposition.Parameters.FileName,
+                        filename
+                    ).toString()
+                )
+                call.respondFile(file)
+            } else {
+                call.respondText("File not found", status = HttpStatusCode.NotFound)
             }
         }
     }

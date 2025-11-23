@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>MCP Tool Composition Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .loading-dots {
+            animation: loading 1.4s infinite both;
+        }
+
+        .loading-dots::before {
+            content: '.';
+            animation: loading-dot 1.4s infinite both;
+        }
+
+        .loading-dots::after {
+            content: '..';
+            animation: loading-dot 1.4s infinite 0.2s both;
+        }
+
+        @keyframes loading-dot {
+            0%, 60%, 100% {
+                opacity: 0.2;
+            }
+            20% {
+                opacity: 1;
+            }
+        }
+
+        .gradient-bg {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+
+        .tool-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .step-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+
+        .success-step {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+        }
+
+        .error-step {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+        }
+    </style>
+</head>
+<body class="min-h-screen gradient-bg">
+<div class="container mx-auto px-4 py-8 max-w-6xl">
+    <!-- Header -->
+    <div class="text-center mb-8">
+        <h1 class="text-4xl font-bold text-white mb-4">
+            <i class="fas fa-link mr-3"></i>MCP Tool Composition
+        </h1>
+        <p class="text-xl text-gray-200">
+            Демонстрация каскадных вызовов MCP инструментов
+        </p>
+        <p class="text-sm text-gray-300 mt-2">
+            День 13 - Композиция MCP-инструментов
+        </p>
+    </div>
+
+    <!-- Tools Overview -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">
+            <i class="fas fa-tools mr-2"></i>Доступные инструменты
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4" id="toolsContainer">
+            <div class="tool-card rounded-lg p-4 text-white">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-search mr-2 text-yellow-300"></i>
+                    <h3 class="font-semibold">search_docs</h3>
+                </div>
+                <p class="text-sm text-gray-200">Поиск текста в документации и исходном коде</p>
+                <div class="mt-2 text-xs text-gray-300">
+                    Параметры: query, path, file_types, max_results
+                </div>
+            </div>
+            <div class="tool-card rounded-lg p-4 text-white">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-compress-alt mr-2 text-green-300"></i>
+                    <h3 class="font-semibold">summarize</h3>
+                </div>
+                <p class="text-sm text-gray-200">Суммаризация текста с использованием AI</p>
+                <div class="mt-2 text-xs text-gray-300">
+                    Параметры: text, style, max_length, language
+                </div>
+            </div>
+            <div class="tool-card rounded-lg p-4 text-white">
+                <div class="flex items-center mb-2">
+                    <i class="fas fa-save mr-2 text-blue-300"></i>
+                    <h3 class="font-semibold">save_to_file</h3>
+                </div>
+                <p class="text-sm text-gray-200">Сохранение контента в файл</p>
+                <div class="mt-2 text-xs text-gray-300">
+                    Параметры: content, file_path, create_dirs, append
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Example Requests -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">
+            <i class="fas fa-lightbulb mr-2"></i>Примеры запросов
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button class="tool-card rounded-lg p-4 text-white text-left hover:bg-white hover:bg-opacity-20 transition"
+                    onclick="setExampleRequest('Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл architecture_summary.txt')">
+                <div class="font-semibold mb-1">Анализ архитектуры</div>
+                <div class="text-sm text-gray-300">Поиск → Суммаризация → Сохранение</div>
+            </button>
+            <button class="tool-card rounded-lg p-4 text-white text-left hover:bg-white hover:bg-opacity-20 transition"
+                    onclick="setExampleRequest('Найди все задачи в проекте, определи критичные и создай отчет critical_tasks.md')">
+                <div class="font-semibold mb-1">Анализ задач</div>
+                <div class="text-sm text-gray-300">Поиск → Фильтрация → Сохранение</div>
+            </button>
+            <button class="tool-card rounded-lg p-4 text-white text-left hover:bg-white hover:bg-opacity-20 transition"
+                    onclick="setExampleRequest('Проанализируй файлы README этого проекта и создай краткое описание functionality.md')">
+                <div class="font-semibold mb-1">Документация проекта</div>
+                <div class="text-sm text-gray-300">Поиск → Анализ → Сохранение</div>
+            </button>
+            <button class="tool-card rounded-lg p-4 text-white text-left hover:bg-white hover:bg-opacity-20 transition"
+                    onclick="setExampleRequest('Найди информацию о запуске проекта и создай инструкции setup_guide.md')">
+                <div class="font-semibold mb-1">Инструкция по установке</div>
+                <div class="text-sm text-gray-300">Поиск → Суммаризация → Сохранение</div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Request Form -->
+    <div class="mb-8">
+        <h2 class="text-2xl font-semibold text-white mb-4">
+            <i class="fas fa-terminal mr-2"></i>Выполнить композицию
+        </h2>
+        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-lg p-6">
+            <div class="mb-4">
+                <label class="block text-white font-medium mb-2" for="requestInput">
+                    Ваш запрос:
+                </label>
+                <textarea
+                        class="w-full px-4 py-3 rounded-lg bg-white bg-opacity-20 text-white placeholder-gray-300 border border-white border-opacity-30 focus:outline-none focus:ring-2 focus:ring-white focus:ring-opacity-50"
+                        id="requestInput"
+                        placeholder="Например: Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл"
+                        rows="3"></textarea>
+            </div>
+            <button
+                    class="bg-gradient-to-r from-green-500 to-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-green-600 hover:to-blue-700 transition flex items-center"
+                    id="executeButton"
+                    onclick="executeComposition()">
+                <i class="fas fa-play mr-2"></i>
+                <span id="executeButtonText">Выполнить</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="hidden mb-8" id="loadingState">
+        <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-lg p-6 text-center">
+            <div class="text-white">
+                <i class="fas fa-cog fa-spin text-3xl mb-4"></i>
+                <div class="text-lg font-semibold">Выполняю композицию инструментов<span class="loading-dots"></span>
+                </div>
+                <div class="text-sm text-gray-300 mt-2">Анализирую запрос и создаю план выполнения</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Section -->
+    <div class="hidden" id="resultsSection">
+        <!-- Plan -->
+        <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-3">
+                <i class="fas fa-clipboard-list mr-2"></i>План выполнения
+            </h3>
+            <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-lg p-4">
+                <div class="text-white mb-3" id="planDescription"></div>
+                <div class="space-y-2" id="planSteps"></div>
+            </div>
+        </div>
+
+        <!-- Execution Results -->
+        <div class="mb-6">
+            <h3 class="text-xl font-semibold text-white mb-3">
+                <i class="fas fa-tasks mr-2"></i>Результаты выполнения
+            </h3>
+            <div class="space-y-3" id="executionResults"></div>
+        </div>
+
+        <!-- Final Output -->
+        <div>
+            <h3 class="text-xl font-semibold text-white mb-3">
+                <i class="fas fa-file-alt mr-2"></i>Финальный результат
+            </h3>
+            <div class="bg-white bg-opacity-10 backdrop-filter backdrop-blur-lg rounded-lg p-4">
+                <pre class="text-white whitespace-pre-wrap font-mono text-sm" id="finalOutput"></pre>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div class="hidden mb-8" id="errorState">
+        <div class="bg-red-500 bg-opacity-20 backdrop-filter backdrop-blur-lg rounded-lg p-6 border border-red-300 border-opacity-30">
+            <div class="text-red-100">
+                <i class="fas fa-exclamation-triangle text-2xl mb-3"></i>
+                <div class="text-lg font-semibold mb-2">Ошибка выполнения</div>
+                <div class="text-sm" id="errorMessage"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let isLoading = false;
+
+    function setExampleRequest(request) {
+        document.getElementById('requestInput').value = request;
+    }
+
+    async function loadTools() {
+        try {
+            const response = await fetch('/mcp/composition/tools');
+            const data = await response.json();
+
+            if (data.tools && data.tools.length > 0) {
+                // Дополнительные инструменты уже отображены статически
+                console.log('Loaded composition tools:', data.tools);
+            }
+        } catch (error) {
+            console.error('Error loading tools:', error);
+        }
+    }
+
+    async function executeComposition() {
+        if (isLoading) return;
+
+        const request = document.getElementById('requestInput').value.trim();
+        if (!request) {
+            showError('Пожалуйста, введите запрос для выполнения композиции');
+            return;
+        }
+
+        setLoading(true);
+
+        try {
+            const response = await fetch('/mcp/composition', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({request})
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Ошибка выполнения запроса');
+            }
+
+            displayResults(data);
+
+        } catch (error) {
+            showError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    function setLoading(loading) {
+        isLoading = loading;
+        const loadingState = document.getElementById('loadingState');
+        const resultsSection = document.getElementById('resultsSection');
+        const errorState = document.getElementById('errorState');
+        const executeButton = document.getElementById('executeButton');
+        const executeButtonText = document.getElementById('executeButtonText');
+
+        if (loading) {
+            loadingState.classList.remove('hidden');
+            resultsSection.classList.add('hidden');
+            errorState.classList.add('hidden');
+            executeButton.disabled = true;
+            executeButtonText.textContent = 'Выполнение...';
+            executeButton.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {
+            loadingState.classList.add('hidden');
+            executeButton.disabled = false;
+            executeButtonText.textContent = 'Выполнить';
+            executeButton.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+    }
+
+    function displayResults(result) {
+        const resultsSection = document.getElementById('resultsSection');
+        const errorState = document.getElementById('errorState');
+
+        errorState.classList.add('hidden');
+        resultsSection.classList.remove('hidden');
+
+        // Отображаем план
+        const planDescription = document.getElementById('planDescription');
+        const planSteps = document.getElementById('planSteps');
+
+        planDescription.textContent = result.plan.description;
+        planSteps.innerHTML = '';
+
+        result.plan.steps.forEach((step, index) => {
+            const stepElement = document.createElement('div');
+            stepElement.className = 'flex items-center text-white text-sm';
+            stepElement.innerHTML = `
+                    <span class="bg-white bg-opacity-20 rounded-full w-6 h-6 flex items-center justify-center mr-3 text-xs font-semibold">
+                        ${index + 1}
+                    </span>
+                    <span class="font-medium">${step.toolName}</span>
+                    <span class="mx-2">→</span>
+                    <span class="text-gray-300">${step.description}</span>
+                    ${step.outputVariable ? `<span class="ml-2 text-blue-300">[${step.outputVariable}]</span>` : ''}
+                `;
+            planSteps.appendChild(stepElement);
+        });
+
+        // Отображаем результаты выполнения
+        const executionResults = document.getElementById('executionResults');
+        executionResults.innerHTML = '';
+
+        result.executionResults.forEach((result, index) => {
+            const resultElement = document.createElement('div');
+            const isSuccess = result.success;
+
+            resultElement.className = `p-4 rounded-lg ${isSuccess ? 'success-step' : 'error-step'}`;
+            resultElement.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="text-white">
+                            <div class="flex items-center mb-2">
+                                <i class="fas ${isSuccess ? 'fa-check-circle' : 'fa-exclamation-circle'} mr-2"></i>
+                                <span class="font-semibold">${result.step.description}</span>
+                                <span class="ml-2 text-sm opacity-75">(${result.executionTimeMs}ms)</span>
+                            </div>
+                            <div class="text-sm mb-1">
+                                <strong>Инструмент:</strong> ${result.step.toolName}
+                            </div>
+                            ${result.step.outputVariable ? `<div class="text-sm mb-1"><strong>Переменная:</strong> ${result.step.outputVariable}</div>` : ''}
+                            ${!isSuccess ? `<div class="text-sm text-red-200"><strong>Ошибка:</strong> ${result.error}</div>` : ''}
+                        </div>
+                    </div>
+                `;
+
+            executionResults.appendChild(resultElement);
+        });
+
+        // Отображаем финальный результат
+        const finalOutput = document.getElementById('finalOutput');
+        finalOutput.textContent = result.finalOutput;
+    }
+
+    function showError(message) {
+        const resultsSection = document.getElementById('resultsSection');
+        const errorState = document.getElementById('errorState');
+        const errorMessage = document.getElementById('errorMessage');
+
+        resultsSection.classList.add('hidden');
+        errorState.classList.remove('hidden');
+        errorMessage.textContent = message;
+    }
+
+    // Инициализация при загрузке страницы
+    document.addEventListener('DOMContentLoaded', function () {
+        loadTools();
+
+        // Обработка Enter в textarea
+        document.getElementById('requestInput').addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                executeComposition();
+            }
+        });
+    });
+</script>
+</body>
+</html>

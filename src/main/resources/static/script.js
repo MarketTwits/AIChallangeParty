@@ -1,3 +1,5 @@
+console.log('✅ script.js loading started...');
+
 const messagesContainer = document.getElementById('messages');
 const chatForm = document.getElementById('chat-form');
 const userInput = document.getElementById('user-input');
@@ -8,6 +10,8 @@ const closeModalBtn = document.getElementById('close-modal');
 const remainingCountEl = document.getElementById('remaining-count');
 const messageCounterEl = document.getElementById('message-counter');
 const chatContainer = document.getElementById('chat-container');
+
+console.log('✅ script.js DOM elements initialized');
 const chatBackdrop = document.getElementById('chat-backdrop');
 const expandIndicator = document.querySelector('.expand-indicator');
 const contextLimitSlider = document.getElementById('context-limit-slider');
@@ -1491,35 +1495,44 @@ function generateMcpSessionId() {
 // Initialize MCP session
 function initializeMcpSession() {
     mcpSessionId = generateMcpSessionId();
-    document.getElementById('mcp-session-id').textContent = mcpSessionId;
+    const sessionIdElement = document.getElementById('mcp-session-id');
+    if (sessionIdElement) {
+        sessionIdElement.textContent = mcpSessionId;
+    }
     loadMcpStatus();
     loadMcpTools();
 }
 
 // Load MCP status
 async function loadMcpStatus() {
+    const statusElement = document.getElementById('mcp-github-status');
+    if (!statusElement) return; // Element doesn't exist, skip
+
     try {
         const response = await fetch('/mcp/status');
         const data = await response.json();
 
         if (response.ok) {
-            document.getElementById('mcp-github-status').textContent = data.githubTokenConfigured ? '✅ Configured' : '❌ Not set';
+            statusElement.textContent = data.githubTokenConfigured ? '✅ Configured' : '❌ Not set';
         } else {
-            document.getElementById('mcp-github-status').textContent = '❌ Error';
+            statusElement.textContent = '❌ Error';
         }
     } catch (error) {
-        document.getElementById('mcp-github-status').textContent = '❌ Offline';
+        statusElement.textContent = '❌ Offline';
     }
 }
 
 // Load available MCP tools
 async function loadMcpTools() {
+    const toolsContainer = document.getElementById('mcp-available-tools');
+    const toolsCount = document.getElementById('mcp-tools-count');
+
+    // If elements don't exist, skip
+    if (!toolsContainer || !toolsCount) return;
+
     try {
         const response = await fetch('/github/tools');
         const data = await response.json();
-
-        const toolsContainer = document.getElementById('mcp-available-tools');
-        const toolsCount = document.getElementById('mcp-tools-count');
 
         if (response.ok && data.status === 'connected') {
             const tools = data.tools || [];
@@ -1540,8 +1553,6 @@ async function loadMcpTools() {
             toolsCount.textContent = 'Error';
         }
     } catch (error) {
-        const toolsContainer = document.getElementById('mcp-available-tools');
-        const toolsCount = document.getElementById('mcp-tools-count');
         toolsContainer.innerHTML = '<div class="text-center text-red-500 col-span-2">Ошибка сети</div>';
         toolsCount.textContent = 'Offline';
     }
@@ -2147,6 +2158,390 @@ function hideNotification() {
     }
 }
 
+// MCP Composition Functions
+function setCompositionExample(request) {
+    document.getElementById('composition-request-input').value = request;
+}
+
+function showCompositionLoading() {
+    document.getElementById('composition-loading').classList.remove('hidden');
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+
+    const executeBtn = document.getElementById('composition-execute-btn');
+    const executeText = document.getElementById('composition-execute-text');
+    executeBtn.disabled = true;
+    executeText.textContent = 'Выполнение...';
+}
+
+function hideCompositionLoading() {
+    document.getElementById('composition-loading').classList.add('hidden');
+
+    const executeBtn = document.getElementById('composition-execute-btn');
+    const executeText = document.getElementById('composition-execute-text');
+    executeBtn.disabled = false;
+    executeText.textContent = 'Выполнить';
+}
+
+function showCompositionResults(result) {
+    document.getElementById('composition-results').classList.remove('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+
+    // Display plan
+    const planDescription = document.getElementById('composition-plan-description');
+    const planSteps = document.getElementById('composition-plan-steps');
+
+    planDescription.textContent = result.plan.description;
+    planSteps.innerHTML = '';
+
+    result.plan.steps.forEach((step, index) => {
+        const stepElement = document.createElement('div');
+        stepElement.className = 'flex items-center text-gray-700 text-sm p-3 bg-white rounded-lg border border-gray-200';
+        stepElement.innerHTML = `
+            <span class="bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center mr-3 text-xs font-semibold">
+                ${index + 1}
+            </span>
+            <div class="flex-1">
+                <div class="font-medium text-gray-800">${step.toolName}</div>
+                <div class="text-gray-600 text-xs">${step.description}</div>
+                ${step.outputVariable ? `<div class="text-blue-600 text-xs mt-1">Переменная: ${step.outputVariable}</div>` : ''}
+            </div>
+        `;
+        planSteps.appendChild(stepElement);
+    });
+
+    // Display execution results
+    const executionResults = document.getElementById('composition-execution-results');
+    executionResults.innerHTML = '';
+
+    result.executionResults.forEach((result, index) => {
+        const resultElement = document.createElement('div');
+        const isSuccess = result.success;
+
+        resultElement.className = `p-4 rounded-lg border ${
+            isSuccess
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
+        }`;
+
+        resultElement.innerHTML = `
+            <div class="flex items-start">
+                <div class="mr-3">
+                    <i class="fas ${isSuccess ? 'fa-check-circle text-green-600' : 'fa-exclamation-circle text-red-600'} text-lg"></i>
+                </div>
+                <div class="flex-1">
+                    <div class="font-semibold mb-1 ${isSuccess ? 'text-green-800' : 'text-red-800'}">
+                        ${result.step.description}
+                    </div>
+                    <div class="text-sm ${isSuccess ? 'text-green-700' : 'text-red-700'}">
+                        <strong>Инструмент:</strong> ${result.step.toolName}
+                        <span class="ml-2">(${result.executionTimeMs}ms)</span>
+                    </div>
+                    ${result.step.outputVariable ? `<div class="text-xs ${isSuccess ? 'text-green-600' : 'text-red-600'}"><strong>Переменная:</strong> ${result.step.outputVariable}</div>` : ''}
+                    ${!isSuccess ? `<div class="text-sm text-red-600 mt-1"><strong>Ошибка:</strong> ${result.error}</div>` : ''}
+                </div>
+            </div>
+        `;
+
+        executionResults.appendChild(resultElement);
+    });
+
+    // Display final output
+    const finalOutput = document.getElementById('composition-final-output');
+    finalOutput.textContent = result.finalOutput;
+}
+
+function showCompositionError(errorMessage) {
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.remove('hidden');
+    document.getElementById('composition-error-message').textContent = errorMessage;
+}
+
+function clearCompositionResults() {
+    document.getElementById('composition-results').classList.add('hidden');
+    document.getElementById('composition-error').classList.add('hidden');
+    document.getElementById('composition-loading').classList.add('hidden');
+    document.getElementById('composition-request-input').value = '';
+}
+
+async function executeComposition() {
+    const request = document.getElementById('composition-request-input').value.trim();
+    if (!request) {
+        alert('Пожалуйста, введите запрос для выполнения композиции');
+        return;
+    }
+
+    showCompositionLoading();
+
+    try {
+        const response = await fetch('/mcp/composition', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({request})
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Ошибка выполнения запроса');
+        }
+
+        const result = await response.json();
+        showCompositionResults(result);
+
+    } catch (error) {
+        console.error('Error executing composition:', error);
+        showCompositionError(error.message);
+    } finally {
+        hideCompositionLoading();
+    }
+}
+
+// ============= MCP ORCHESTRATION FUNCTIONS =============
+
+// Load orchestration servers status
+async function loadOrchestrationServers() {
+    console.log('Loading orchestration servers...');
+    try {
+        const response = await fetch('/api/orchestration/servers');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Servers data:', data);
+
+        const container = document.getElementById('orch-servers-status');
+        if (!container) {
+            console.error('Container #orch-servers-status not found!');
+            return;
+        }
+
+        container.innerHTML = data.servers.map(server => `
+            <div class="p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-all">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="font-semibold text-gray-800 text-sm">${server.serverName}</span>
+                    <span class="badge badge-${server.serverId} text-xs">${server.serverId}</span>
+                </div>
+                <div class="text-xs text-gray-600 space-y-1">
+                    <div>v${server.version}</div>
+                    <div>Tools: <span class="font-semibold">${server.toolCount}</span></div>
+                    <div>State: <span class="font-semibold ${server.state === 'READY' ? 'text-green-600' : 'text-red-600'}">${server.state}</span></div>
+                </div>
+            </div>
+        `).join('');
+        console.log('Servers loaded successfully!');
+    } catch (error) {
+        console.error('Error loading orchestration servers:', error);
+        const container = document.getElementById('orch-servers-status');
+        if (container) {
+            container.innerHTML = `<div class="text-center text-red-500 text-sm py-4">Ошибка загрузки: ${error.message}</div>`;
+        }
+    }
+}
+
+// Load available orchestration tools
+async function loadOrchestrationTools() {
+    console.log('Loading orchestration tools...');
+    try {
+        const response = await fetch('/api/orchestration/tools');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('Tools data:', data);
+
+        const container = document.getElementById('orch-tools-list');
+        if (!container) {
+            console.error('Container #orch-tools-list not found!');
+            return;
+        }
+
+        container.innerHTML = data.tools.map(tool => `
+            <div class="tool-item p-2 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-100">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-gray-800 text-sm truncate">${tool.name}</div>
+                        <div class="text-xs text-gray-600 mt-1 line-clamp-2">${tool.description}</div>
+                    </div>
+                    <span class="badge badge-${tool.serverId} ml-2 flex-shrink-0 text-xs">${tool.serverId}</span>
+                </div>
+            </div>
+        `).join('');
+        console.log(`Loaded ${data.tools.length} tools successfully!`);
+    } catch (error) {
+        console.error('Error loading orchestration tools:', error);
+        const container = document.getElementById('orch-tools-list');
+        if (container) {
+            container.innerHTML = `<div class="text-center text-red-500 text-sm py-4">Ошибка загрузки: ${error.message}</div>`;
+        }
+    }
+}
+
+// Execute orchestration
+async function executeOrchestration(query) {
+    const resultsContainer = document.getElementById('orch-results-container');
+    const loadingIndicator = document.getElementById('orch-loading-indicator');
+    const executeBtn = document.getElementById('orch-execute-btn');
+
+    if (!resultsContainer || !loadingIndicator || !executeBtn) return;
+
+    resultsContainer.classList.add('hidden');
+    loadingIndicator.classList.remove('hidden');
+    executeBtn.disabled = true;
+
+    try {
+        const response = await fetch('/api/orchestration/execute', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({query})
+        });
+
+        const result = await response.json();
+
+        // Display results
+        displayOrchestrationResults(result);
+
+        resultsContainer.classList.remove('hidden');
+
+        // Scroll to results
+        resultsContainer.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+    } catch (error) {
+        console.error('Error executing orchestration:', error);
+        showNotification('❌ Ошибка выполнения: ' + error.message, 'error');
+    } finally {
+        loadingIndicator.classList.add('hidden');
+        executeBtn.disabled = false;
+    }
+}
+
+// Display orchestration results
+function displayOrchestrationResults(result) {
+    // Execution time
+    const execTimeEl = document.getElementById('orch-exec-time');
+    if (execTimeEl) {
+        execTimeEl.textContent = `${result.elapsedTimeMs}ms`;
+    }
+
+    // Token usage
+    const tokenUsageEl = document.getElementById('orch-token-usage');
+    if (tokenUsageEl) {
+        const totalTokens = (result.inputTokens || 0) + (result.outputTokens || 0);
+        tokenUsageEl.textContent = `${totalTokens} tokens`;
+    }
+
+    // Execution steps
+    const stepsContainer = document.getElementById('orch-execution-steps');
+    if (stepsContainer) {
+        stepsContainer.innerHTML = result.executionSteps.map((step, idx) => `
+            <div class="p-3 bg-white rounded-lg border-l-4 ${step.success ? 'border-green-500' : 'border-red-500'}">
+                <div class="flex items-start">
+                    <div class="flex-shrink-0 w-6 h-6 rounded-full ${step.success ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'} flex items-center justify-center text-xs font-bold mr-2">
+                        ${step.step}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="font-semibold text-gray-800 text-sm">${step.action}</div>
+                        <div class="text-xs text-gray-600 mt-1">${step.description}</div>
+                        ${step.toolsInvolved && step.toolsInvolved.length > 0 ? `
+                            <div class="mt-2 flex flex-wrap gap-1">
+                                ${step.toolsInvolved.map(tool => `<span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">${tool}</span>`).join('')}
+                            </div>
+                        ` : ''}
+                        ${step.result ? `<div class="mt-2 p-2 bg-gray-50 rounded text-xs font-mono max-h-20 overflow-y-auto">${step.result.substring(0, 200)}${step.result.length > 200 ? '...' : ''}</div>` : ''}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Servers used
+    const serversContainer = document.getElementById('orch-servers-used');
+    if (serversContainer) {
+        serversContainer.innerHTML = result.serversUsed.map(serverId => `
+            <span class="badge badge-${serverId}">${serverId}</span>
+        `).join('');
+    }
+
+    // Final response
+    const finalResponseEl = document.getElementById('orch-final-response');
+    if (finalResponseEl) {
+        finalResponseEl.textContent = result.response;
+    }
+}
+
+// Initialize orchestration tab
+let orchestrationTabInitialized = false;
+
+function initializeOrchestrationTab() {
+    // Load servers and tools on every tab open
+    loadOrchestrationServers();
+    loadOrchestrationTools();
+
+    // Only attach event listeners once
+    if (orchestrationTabInitialized) {
+        return;
+    }
+    orchestrationTabInitialized = true;
+
+    // Execute button
+    const executeBtn = document.getElementById('orch-execute-btn');
+    const queryInput = document.getElementById('orch-query-input');
+
+    if (executeBtn && queryInput) {
+        executeBtn.addEventListener('click', () => {
+            const query = queryInput.value.trim();
+            if (query) {
+                executeOrchestration(query);
+            } else {
+                showNotification('⚠️ Введите запрос для выполнения', 'error');
+            }
+        });
+
+        // Enter key to execute (Shift+Enter for new line)
+        queryInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                const query = queryInput.value.trim();
+                if (query) {
+                    executeOrchestration(query);
+                }
+            }
+        });
+    }
+
+    // Example queries
+    const exampleButtons = document.querySelectorAll('.orch-example-query');
+    if (exampleButtons) {
+        exampleButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const query = btn.textContent.trim();
+                if (queryInput) {
+                    queryInput.value = query;
+                    queryInput.focus();
+                }
+            });
+        });
+    }
+
+    // Tool search
+    const toolSearchInput = document.getElementById('orch-tool-search');
+    if (toolSearchInput) {
+        toolSearchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const tools = document.querySelectorAll('.tool-item');
+            tools.forEach(tool => {
+                const text = tool.textContent.toLowerCase();
+                tool.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+    }
+
+    // Refresh servers every 30 seconds
+    setInterval(loadOrchestrationServers, 30000);
+}
+
+// ============= END MCP ORCHESTRATION FUNCTIONS =============
+
 // Initialize chat history when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadCoachStyle();
@@ -2173,4 +2568,50 @@ document.addEventListener('DOMContentLoaded', () => {
             loadReminders();
         });
     }
+
+    // Add tab switching for composition
+    const compositionTab = document.getElementById('tab-composition');
+    if (compositionTab) {
+        compositionTab.addEventListener('click', () => {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active-tab');
+            });
+
+            // Show composition tab
+            document.getElementById('composition-content').classList.add('active');
+            compositionTab.classList.add('active-tab');
+        });
+    }
+
+    // Add tab switching for MCP orchestration
+    const mcpTab = document.getElementById('tab-mcp');
+    if (mcpTab) {
+        console.log('MCP tab found, attaching click handler');
+        mcpTab.addEventListener('click', () => {
+            console.log('MCP tab clicked!');
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelectorAll('.nav-link').forEach(link => {
+                link.classList.remove('active-tab');
+            });
+
+            // Show MCP orchestration tab
+            document.getElementById('mcp-content').classList.add('active');
+            mcpTab.classList.add('active-tab');
+
+            // Initialize orchestration when tab is opened
+            console.log('Calling initializeOrchestrationTab()');
+            initializeOrchestrationTab();
+        });
+    } else {
+        console.error('MCP tab #tab-mcp not found!');
+    }
+
+    console.log('✅ DOMContentLoaded complete - all event listeners attached');
 });
