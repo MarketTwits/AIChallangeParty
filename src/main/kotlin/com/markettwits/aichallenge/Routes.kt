@@ -1,6 +1,9 @@
 package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.DemoMcpIntegration.*
+import com.markettwits.aichallenge.rag.OllamaEmbeddingClient
+import com.markettwits.aichallenge.rag.RAGProgressTracker
+import com.markettwits.aichallenge.rag.RAGRetriever
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -14,6 +17,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.format.DateTimeFormatter
@@ -47,6 +51,14 @@ fun Application.configureRouting(
     }
 
     val huggingFaceClient = HuggingFaceClient(huggingFaceKey)
+
+    // Initialize RAG system (Day 15)
+    val database = Database.connect("jdbc:sqlite:data/documents.db", driver = "org.sqlite.JDBC")
+    val embeddingClient = OllamaEmbeddingClient()
+    val ragRetriever = RAGRetriever(database, embeddingClient)
+
+    // Flag to track if knowledge base is built
+    var isKnowledgeBaseBuilt = false
 
     routing {
         post("/chat") {
@@ -969,6 +981,157 @@ fun Application.configureRouting(
                 call.respondFile(file)
             } else {
                 call.respondText("File not found", status = HttpStatusCode.NotFound)
+            }
+        }
+
+        // RAG System Endpoints (Day 15)
+        post("/rag/build-knowledge-base") {
+            try {
+                logger.info("Starting knowledge base build...")
+                call.respond(HttpStatusCode.Accepted, mapOf("status" to "Building knowledge base in progress..."))
+
+                // Build knowledge base asynchronously
+                ragRetriever.buildKnowledgeBase("data/farming")
+                isKnowledgeBaseBuilt = true
+
+                logger.info("Knowledge base built successfully")
+                call.respond(
+                    mapOf(
+                        "status" to "success",
+                        "message" to "Knowledge base built successfully",
+                        "stats" to ragRetriever.getStats()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error building knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message, "status" to "error")
+                )
+            }
+        }
+
+        post("/rag/search") {
+            try {
+                data class RAGSearchRequest(val query: String, val topK: Int = 5)
+
+                val request = call.receive<RAGSearchRequest>()
+
+                logger.info("RAG search for query: ${request.query.take(100)}")
+
+                if (!isKnowledgeBaseBuilt) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Knowledge base not built yet. Call /rag/build-knowledge-base first")
+                    )
+                }
+
+                val results = ragRetriever.retrieveRelevant(request.query, request.topK)
+
+                val formattedResults = results.map { chunk ->
+                    mapOf(
+                        "text" to chunk.text,
+                        "sourceFile" to chunk.sourceFile,
+                        "chunkIndex" to chunk.chunkIndex,
+                        "similarity" to chunk.similarity
+                    )
+                }
+
+                call.respond(
+                    mapOf(
+                        "query" to request.query,
+                        "results" to formattedResults,
+                        "count" to formattedResults.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error searching knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/stats") {
+            try {
+                val stats = ragRetriever.getStats()
+                call.respond(
+                    mapOf(
+                        "stats" to stats,
+                        "isBuilt" to isKnowledgeBaseBuilt
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG stats", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/reload") {
+            try {
+                logger.info("Reloading knowledge base...")
+                ragRetriever.reloadKnowledgeBase("data/farming")
+                isKnowledgeBaseBuilt = true
+
+                call.respond(
+                    mapOf(
+                        "status" to "success",
+                        "message" to "Knowledge base reloaded successfully",
+                        "stats" to ragRetriever.getStats()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error reloading knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        // RAG Progress Tracking Endpoints (Day 15 - Progress)
+        get("/rag/progress") {
+            try {
+                val progress = RAGProgressTracker.getProgress()
+                call.respond(progress)
+            } catch (e: Exception) {
+                logger.error("Error getting RAG progress", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/progress/logs") {
+            try {
+                val logs = RAGProgressTracker.getDetailedLogs()
+                call.respond(
+                    mapOf(
+                        "logs" to logs,
+                        "count" to logs.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG logs", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/progress/console") {
+            try {
+                val progress = RAGProgressTracker.getProgress()
+                call.respondText(progress.toConsoleOutput(), contentType = ContentType.Text.Plain)
+            } catch (e: Exception) {
+                logger.error("Error getting RAG console output", e)
+                call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
             }
         }
     }
