@@ -1,9 +1,7 @@
 package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.DemoMcpIntegration.*
-import com.markettwits.aichallenge.rag.OllamaEmbeddingClient
-import com.markettwits.aichallenge.rag.RAGProgressTracker
-import com.markettwits.aichallenge.rag.RAGRetriever
+import com.markettwits.aichallenge.rag.*
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -15,12 +13,20 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.format.DateTimeFormatter
+
+// RAG Query Request models
+@Serializable
+data class RAGQueryRequest(val question: String, val topK: Int = 5)
+
+@Serializable
+data class RAGCompareRequest(val question: String, val topK: Int = 5)
 
 fun Application.configureRouting(
     sessionManager: SessionManager,
@@ -56,6 +62,12 @@ fun Application.configureRouting(
     val database = Database.connect("jdbc:sqlite:data/documents.db", driver = "org.sqlite.JDBC")
     val embeddingClient = OllamaEmbeddingClient()
     val ragRetriever = RAGRetriever(database, embeddingClient)
+
+    // Initialize RAG Query system (Day 16)
+    val llmClient = OllamaLLMClient(model = "llama3.2")
+    val vectorStore = VectorStore()
+    val ragQueryService = RAGQueryService(database, embeddingClient, llmClient, vectorStore)
+    val ragComparisonService = RAGComparisonService(ragQueryService)
 
     // Flag to track if knowledge base is built
     var isKnowledgeBaseBuilt = false
@@ -1132,6 +1144,106 @@ fun Application.configureRouting(
             } catch (e: Exception) {
                 logger.error("Error getting RAG console output", e)
                 call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
+            }
+        }
+
+        // RAG Query Endpoints (Day 16)
+        post("/rag/query") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("RAG query: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragQueryService.queryWithRAG(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG query", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/query-without-rag") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("Query without RAG: ${request.question}")
+
+                if (!llmClient.isAvailable()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Ollama LLM service is not available")
+                    )
+                }
+
+                val result = ragQueryService.queryWithoutRAG(request.question)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing query without RAG", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/compare") {
+            try {
+                val request = call.receive<RAGCompareRequest>()
+
+                logger.info("RAG comparison for: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragComparisonService.compare(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG comparison", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/status") {
+            try {
+                val isReady = ragQueryService.isReady()
+                val stats = ragQueryService.getStats()
+                val totalChunks = stats["totalChunks"] ?: 0
+                val sources = stats["sources"] ?: 0
+
+                call.respondText(
+                    contentType = ContentType.Application.Json,
+                    text = """{"ready":$isReady,"totalChunks":$totalChunks,"sources":$sources,"ollamaEmbedding":${embeddingClient.isAvailable()},"ollamaLLM":${llmClient.isAvailable()}}"""
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG status", e)
+                call.respondText(
+                    contentType = ContentType.Application.Json,
+                    status = HttpStatusCode.InternalServerError,
+                    text = """{"error":"${e.message}"}"""
+                )
             }
         }
     }
