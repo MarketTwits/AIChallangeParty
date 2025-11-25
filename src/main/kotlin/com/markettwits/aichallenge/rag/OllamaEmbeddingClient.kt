@@ -26,6 +26,9 @@ data class OllamaBatchEmbeddingRequest(
 data class OllamaEmbeddingResponse(
     val model: String,
     val embeddings: List<List<Double>>,
+    val total_duration: Long? = null,
+    val load_duration: Long? = null,
+    val prompt_eval_count: Int? = null,
 )
 
 /**
