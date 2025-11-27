@@ -1226,6 +1226,34 @@ fun Application.configureRouting(
             }
         }
 
+        post("/rag/query-alternatives") {
+            try {
+                @Serializable
+                data class AlternativesRequest(
+                    val question: String,
+                    val offset: Int = 0,
+                    val limit: Int = 3,
+                )
+
+                val request = call.receive<AlternativesRequest>()
+                logger.info("Getting alternative chunks for: ${request.question}")
+
+                val result = ragQueryService.getAlternativeChunks(
+                    question = request.question,
+                    offset = request.offset,
+                    limit = request.limit
+                )
+
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error getting alternative chunks", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
         get("/rag/status") {
             try {
                 val isReady = ragQueryService.isReady()
