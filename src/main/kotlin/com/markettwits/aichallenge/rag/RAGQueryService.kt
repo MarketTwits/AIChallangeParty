@@ -14,6 +14,10 @@ data class RAGQueryResult(
     val retrievedChunks: List<RetrievedChunkInfo>,
     val contextUsed: String,
     val mode: String, // "rag" or "no-rag"
+    val qualityScore: Double = 0.0, // 0-1, quality of retrieved results
+    val suggestion: String = "", // Suggestion for user based on quality
+    val hasFilteredResults: Boolean = false, // True if some results were filtered out
+    val alternativeChunksAvailable: Boolean = false, // True if user can request more chunks
 )
 
 /**
@@ -25,6 +29,7 @@ data class RetrievedChunkInfo(
     val sourceFile: String,
     val chunkIndex: Int,
     val similarity: Double,
+    val headingContext: String = "",
 )
 
 /**
@@ -36,8 +41,12 @@ class RAGQueryService(
     private val embeddingClient: OllamaEmbeddingClient,
     private val llmClient: OllamaLLMClient,
     private val vectorStore: VectorStore,
+    private val relevanceFilter: RelevanceFilter = RelevanceFilter(),
 ) {
     private val logger = LoggerFactory.getLogger(RAGQueryService::class.java)
+
+    // Cache for filtered chunks to allow requesting alternatives
+    private val filteredChunksCache = mutableMapOf<String, List<RetrievedChunk>>()
 
     /**
      * Execute RAG query WITH context retrieval
@@ -89,9 +98,21 @@ class RAGQueryService(
             }"
         )
 
+        // Step 2.5: Rerank chunks using heading context boost
+        logger.debug("Step 2.5: Reranking chunks with heading context boost")
+        val rerankedChunks = relevanceFilter.rerankWithHeadingBoost(retrievedChunks, question)
+        logger.info("Chunks reranked, new top similarity: ${rerankedChunks.firstOrNull()?.similarity}")
+
+        // Step 2.6: Filter and rank chunks
+        logger.debug("Step 2.6: Filtering chunks by relevance")
+        val filterResult = relevanceFilter.filterAndRank(rerankedChunks, question)
+
+        // Cache filtered chunks for potential alternative requests
+        filteredChunksCache[question] = filterResult.filteredOutChunks
+
         // Step 3: Format context from retrieved chunks
-        val context = formatContext(retrievedChunks)
-        logger.debug("Context formatted, length: ${context.length} chars")
+        val context = formatContext(filterResult.relevantChunks)
+        logger.debug("Context formatted from ${filterResult.relevantChunks.size} chunks, length: ${context.length} chars")
 
         // Step 4: Generate answer using LLM with context
         logger.debug("Step 4: Generating answer with LLM using context")
@@ -107,16 +128,21 @@ class RAGQueryService(
         return RAGQueryResult(
             question = question,
             answer = answer,
-            retrievedChunks = retrievedChunks.map { chunk ->
+            retrievedChunks = filterResult.relevantChunks.map { chunk ->
                 RetrievedChunkInfo(
                     text = chunk.text,
                     sourceFile = chunk.sourceFile,
                     chunkIndex = chunk.chunkIndex,
-                    similarity = chunk.similarity
+                    similarity = chunk.similarity,
+                    headingContext = chunk.headingContext
                 )
             },
             contextUsed = context,
-            mode = "rag"
+            mode = "rag",
+            qualityScore = filterResult.qualityScore,
+            suggestion = filterResult.suggestion,
+            hasFilteredResults = filterResult.filteredOutChunks.isNotEmpty(),
+            alternativeChunksAvailable = filterResult.filteredOutChunks.isNotEmpty()
         )
     }
 
@@ -165,6 +191,83 @@ class RAGQueryService(
      */
     fun getStats(): Map<String, Any> {
         return vectorStore.getStats(database)
+    }
+
+    /**
+     * Get alternative chunks for a question (from filtered results)
+     * @param question Original question
+     * @param offset Skip this many chunks
+     * @param limit Return this many chunks
+     * @return List of alternative chunks
+     */
+    suspend fun getAlternativeChunks(
+        question: String,
+        offset: Int = 0,
+        limit: Int = 3,
+    ): RAGQueryResult {
+        logger.info("Getting alternative chunks for question: $question (offset=$offset, limit=$limit)")
+
+        val filteredChunks = filteredChunksCache[question] ?: emptyList()
+
+        if (filteredChunks.isEmpty()) {
+            return RAGQueryResult(
+                question = question,
+                answer = "No alternative chunks available. Try a new query.",
+                retrievedChunks = emptyList(),
+                contextUsed = "",
+                mode = "rag-alternative",
+                suggestion = "Выполните новый поиск или переформулируйте вопрос."
+            )
+        }
+
+        // Get the requested slice of chunks
+        val alternativeChunks = filteredChunks.drop(offset).take(limit)
+
+        if (alternativeChunks.isEmpty()) {
+            return RAGQueryResult(
+                question = question,
+                answer = "No more alternative chunks available.",
+                retrievedChunks = emptyList(),
+                contextUsed = "",
+                mode = "rag-alternative",
+                suggestion = "Все альтернативные чанки просмотрены. Попробуйте новый запрос."
+            )
+        }
+
+        // Format context from alternative chunks
+        val context = formatContext(alternativeChunks)
+
+        // Generate answer using LLM with alternative context
+        val answer = try {
+            llmClient.generateWithContext(question, context)
+        } catch (e: Exception) {
+            logger.error("Failed to generate answer with alternative chunks", e)
+            throw Exception("Failed to generate answer: ${e.message}")
+        }
+
+        val hasMore = filteredChunks.size > (offset + limit)
+
+        return RAGQueryResult(
+            question = question,
+            answer = answer,
+            retrievedChunks = alternativeChunks.map { chunk ->
+                RetrievedChunkInfo(
+                    text = chunk.text,
+                    sourceFile = chunk.sourceFile,
+                    chunkIndex = chunk.chunkIndex,
+                    similarity = chunk.similarity,
+                    headingContext = chunk.headingContext
+                )
+            },
+            contextUsed = context,
+            mode = "rag-alternative",
+            suggestion = if (hasMore) {
+                "Доступны еще ${filteredChunks.size - offset - limit} альтернативных чанков"
+            } else {
+                "Это последние доступные чанки"
+            },
+            alternativeChunksAvailable = hasMore
+        )
     }
 
     /**

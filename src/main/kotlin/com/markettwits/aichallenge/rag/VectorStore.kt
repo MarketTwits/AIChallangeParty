@@ -14,6 +14,7 @@ data class RetrievedChunk(
     val chunkIndex: Int,
     val embedding: List<Double>,
     val similarity: Double,
+    val headingContext: String = "",
 )
 
 data class StoredDocument(
@@ -22,6 +23,7 @@ data class StoredDocument(
     val sourceFile: String,
     val chunkIndex: Int,
     val embedding: List<Double>,
+    val headingContext: String = "",
 )
 
 /**
@@ -33,6 +35,7 @@ object DocumentsTable : IntIdTable("documents") {
     val sourceFile = varchar("source_file", 255)
     val chunkIndex = integer("chunk_index")
     val embedding = text("embedding") // JSON-serialized vector
+    val headingContext = text("heading_context").default("") // Markdown heading hierarchy
     val createdAt = long("created_at").default(System.currentTimeMillis())
 }
 
@@ -64,6 +67,7 @@ class VectorStore {
                 it[sourceFile] = chunk.sourceFile
                 it[chunkIndex] = chunk.chunkIndex
                 it[this.embedding] = json.encodeToString(embedding)
+                it[headingContext] = chunk.headingContext
             }
         }
         logger.debug("Saved chunk ${chunk.chunkIndex} from ${chunk.sourceFile}")
@@ -86,6 +90,7 @@ class VectorStore {
                     it[sourceFile] = chunk.sourceFile
                     it[chunkIndex] = chunk.chunkIndex
                     it[this.embedding] = json.encodeToString(embedding)
+                    it[headingContext] = chunk.headingContext
                 }
             }
         }
@@ -113,7 +118,8 @@ class VectorStore {
                         chunkText = row[DocumentsTable.chunkText],
                         sourceFile = row[DocumentsTable.sourceFile],
                         chunkIndex = row[DocumentsTable.chunkIndex],
-                        embedding = json.decodeFromString(row[DocumentsTable.embedding])
+                        embedding = json.decodeFromString(row[DocumentsTable.embedding]),
+                        headingContext = row[DocumentsTable.headingContext]
                     )
                 }
 
@@ -134,7 +140,8 @@ class VectorStore {
                         sourceFile = doc.sourceFile,
                         chunkIndex = doc.chunkIndex,
                         embedding = doc.embedding,
-                        similarity = similarity
+                        similarity = similarity,
+                        headingContext = doc.headingContext
                     )
                 }
 
@@ -155,7 +162,8 @@ class VectorStore {
                         chunkText = row[DocumentsTable.chunkText],
                         sourceFile = row[DocumentsTable.sourceFile],
                         chunkIndex = row[DocumentsTable.chunkIndex],
-                        embedding = json.decodeFromString(row[DocumentsTable.embedding])
+                        embedding = json.decodeFromString(row[DocumentsTable.embedding]),
+                        headingContext = row[DocumentsTable.headingContext]
                     )
                 }
         }
@@ -173,7 +181,8 @@ class VectorStore {
                         chunkText = row[DocumentsTable.chunkText],
                         sourceFile = row[DocumentsTable.sourceFile],
                         chunkIndex = row[DocumentsTable.chunkIndex],
-                        embedding = json.decodeFromString(row[DocumentsTable.embedding])
+                        embedding = json.decodeFromString(row[DocumentsTable.embedding]),
+                        headingContext = row[DocumentsTable.headingContext]
                     )
                 }
         }
