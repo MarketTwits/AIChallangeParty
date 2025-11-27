@@ -7,8 +7,8 @@ import org.slf4j.LoggerFactory
  * Filters out low-quality chunks and provides alternative suggestions
  */
 class RelevanceFilter(
-    private val minSimilarityThreshold: Double = 0.25,  // Minimum similarity to consider relevant
-    private val optimalSimilarityThreshold: Double = 0.40, // Threshold for high-quality results
+    private val minSimilarityThreshold: Double = 0.05,  // Minimum similarity to consider relevant (lowered for Day 18 demo)
+    private val optimalSimilarityThreshold: Double = 0.15, // Threshold for high-quality results (lowered for Day 18 demo)
 ) {
     private val logger = LoggerFactory.getLogger(RelevanceFilter::class.java)
 

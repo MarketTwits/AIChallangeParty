@@ -1254,6 +1254,33 @@ fun Application.configureRouting(
             }
         }
 
+        post("/rag/query-with-citations") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("RAG query WITH citations: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragQueryService.queryWithRAGAndCitations(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG query with citations", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
         get("/rag/status") {
             try {
                 val isReady = ragQueryService.isReady()

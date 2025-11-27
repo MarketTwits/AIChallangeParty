@@ -33,12 +33,12 @@ data class OllamaEmbeddingResponse(
 
 /**
  * HTTP Client for Ollama embedding API
- * Generates embeddings using the nomic-embed-text model
+ * Generates embeddings using local Ollama models
  * Model runs locally at http://localhost:11434
  */
 class OllamaEmbeddingClient(
     private val baseUrl: String = "http://localhost:11434",
-    private val model: String = "nomic-embed-text",
+    private val model: String = "nomic-embed-text",  // Can be changed to other models (e.g., mxbai-embed-large for better Russian support)
     private val timeout: Long = 60000,
 ) {
     private val logger = LoggerFactory.getLogger(OllamaEmbeddingClient::class.java)
