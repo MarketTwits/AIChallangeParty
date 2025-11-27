@@ -30,6 +30,7 @@ data class RetrievedChunkInfo(
     val chunkIndex: Int,
     val similarity: Double,
     val headingContext: String = "",
+    val isCited: Boolean = false,  // Whether this source was cited in the answer
 )
 
 /**
@@ -147,6 +148,103 @@ class RAGQueryService(
     }
 
     /**
+     * Execute RAG query WITH context retrieval AND explicit citations
+     * @param question User's question
+     * @param topK Number of chunks to retrieve (default: 5)
+     * @return RAGQueryResult with answer, retrieved chunks, and citation info
+     */
+    suspend fun queryWithRAGAndCitations(question: String, topK: Int = 5): RAGQueryResult {
+        logger.info("Processing RAG query WITH citations: $question")
+
+        // Step 1: Generate embedding for the question
+        logger.debug("Step 1: Generating embedding for question")
+        val questionEmbedding = try {
+            embeddingClient.generateEmbedding(question)
+        } catch (e: Exception) {
+            logger.error("Failed to generate embedding for question", e)
+            throw Exception("Failed to generate embedding: ${e.message}")
+        }
+
+        // Step 2: Search for similar chunks in vector store
+        logger.debug("Step 2: Searching for top $topK similar chunks")
+        val retrievedChunks = try {
+            vectorStore.search(database, questionEmbedding, topK)
+        } catch (e: Exception) {
+            logger.error("Failed to search vector store", e)
+            throw Exception("Failed to search vector store: ${e.message}")
+        }
+
+        if (retrievedChunks.isEmpty()) {
+            logger.warn("No chunks found in vector store")
+            return RAGQueryResult(
+                question = question,
+                answer = "No relevant information found in the knowledge base.",
+                retrievedChunks = emptyList(),
+                contextUsed = "",
+                mode = "rag-citations"
+            )
+        }
+
+        // Step 2.5: Rerank chunks using heading context boost
+        logger.debug("Step 2.5: Reranking chunks with heading context boost")
+        val rerankedChunks = relevanceFilter.rerankWithHeadingBoost(retrievedChunks, question)
+
+        // Step 2.6: Filter and rank chunks
+        logger.debug("Step 2.6: Filtering chunks by relevance")
+        val filterResult = relevanceFilter.filterAndRank(rerankedChunks, question)
+
+        // Cache filtered chunks for potential alternative requests
+        filteredChunksCache[question] = filterResult.filteredOutChunks
+
+        // Step 3: Format context from retrieved chunks with citations emphasis
+        val context = formatContextWithCitations(filterResult.relevantChunks)
+        logger.debug("Context formatted with citations from ${filterResult.relevantChunks.size} chunks")
+
+        // Step 4: Generate answer using LLM with context AND citations
+        logger.debug("Step 4: Generating answer with LLM using context and citations")
+        val answer = try {
+            llmClient.generateWithContextAndCitations(question, context)
+        } catch (e: Exception) {
+            logger.error("Failed to generate answer with context and citations", e)
+            throw Exception("Failed to generate answer: ${e.message}")
+        }
+
+        // Step 5: Extract which sources were actually cited in the answer
+        val retrievedChunkInfo = filterResult.relevantChunks.map { chunk ->
+            RetrievedChunkInfo(
+                text = chunk.text,
+                sourceFile = chunk.sourceFile,
+                chunkIndex = chunk.chunkIndex,
+                similarity = chunk.similarity,
+                headingContext = chunk.headingContext,
+                isCited = false  // Will be updated after citation extraction
+            )
+        }
+
+        val citedSources = extractCitedSources(answer, retrievedChunkInfo)
+        val citedSourceKeys = citedSources.map { it.sourceFile to it.chunkIndex }.toSet()
+
+        // Mark which chunks were cited
+        val finalChunkInfo = retrievedChunkInfo.map { chunk ->
+            chunk.copy(isCited = (chunk.sourceFile to chunk.chunkIndex) in citedSourceKeys)
+        }
+
+        logger.info("RAG query with citations completed, ${citedSourceKeys.size} sources cited")
+
+        return RAGQueryResult(
+            question = question,
+            answer = answer,
+            retrievedChunks = finalChunkInfo,
+            contextUsed = context,
+            mode = "rag-citations",
+            qualityScore = filterResult.qualityScore,
+            suggestion = filterResult.suggestion,
+            hasFilteredResults = filterResult.filteredOutChunks.isNotEmpty(),
+            alternativeChunksAvailable = filterResult.filteredOutChunks.isNotEmpty()
+        )
+    }
+
+    /**
      * Execute query WITHOUT RAG (no context retrieval)
      * @param question User's question
      * @return RAGQueryResult with answer only
@@ -184,6 +282,51 @@ class RAGQueryService(
             ${chunk.text}
             """.trimIndent()
         }.joinToString("\n\n---\n\n")
+    }
+
+    /**
+     * Format retrieved chunks with enhanced citation information
+     * @param chunks List of retrieved chunks
+     * @return Formatted context string with detailed source metadata
+     */
+    private fun formatContextWithCitations(chunks: List<RetrievedChunk>): String {
+        return chunks.mapIndexed { index, chunk ->
+            val heading = if (chunk.headingContext.isNotEmpty()) {
+                "\nContext: ${chunk.headingContext}"
+            } else {
+                ""
+            }
+
+            """
+            [Source ${index + 1}]
+            File: ${chunk.sourceFile}
+            Chunk #: ${chunk.chunkIndex}
+            Relevance: ${"%.1f".format(chunk.similarity * 100)}%$heading
+
+            ${chunk.text}
+            """.trimIndent()
+        }.joinToString("\n\n${"=".repeat(80)}\n\n")
+    }
+
+    /**
+     * Extract cited sources from LLM response
+     * @param response LLM response text
+     * @param chunks Available chunks for reference
+     * @return List of RetrievedChunkInfo that were cited
+     */
+    private fun extractCitedSources(
+        response: String,
+        chunks: List<RetrievedChunkInfo>,
+    ): List<RetrievedChunkInfo> {
+        // Look for [Source N] patterns in the response
+        val sourcePattern = """\[Source\s+(\d+)\]""".toRegex()
+        val matches = sourcePattern.findAll(response)
+        val citedIndices = matches.map { it.groupValues[1].toIntOrNull() ?: 0 }.toSet()
+
+        return citedIndices
+            .filter { it in 1..chunks.size }
+            .map { chunks[it - 1] }
+            .distinctBy { it.sourceFile to it.chunkIndex }
     }
 
     /**

@@ -131,6 +131,45 @@ class OllamaLLMClient(
     }
 
     /**
+     * Generate text completion WITH context AND explicit citation instructions
+     * @param question User's question
+     * @param context Retrieved context from vector database
+     * @return LLM response text with citations
+     */
+    suspend fun generateWithContextAndCitations(question: String, context: String): String {
+        return try {
+            logger.info("Generating response WITH context AND citations for question: $question")
+            logger.debug("Context length: ${context.length} chars")
+
+            val prompt = """
+                You are an AI assistant that answers questions based on the provided context.
+                IMPORTANT: You MUST cite your sources in the answer.
+
+                Instructions for citations:
+                1. Use ONLY the information from the context below to answer the question
+                2. After each fact or claim, indicate the source number in brackets: [Source N]
+                3. If a sentence uses information from multiple sources, cite all of them: [Source 1, Source 2]
+                4. If the context doesn't contain enough information, say so explicitly
+                5. At the end of your answer, provide a "Sources:" section listing which sources you used
+
+                Context:
+                $context
+
+                Question: $question
+
+                Answer with citations:
+            """.trimIndent()
+
+            val response = sendGenerateRequest(prompt)
+            logger.info("Response generated with context and citations (length: ${response.length} chars)")
+            response
+        } catch (e: Exception) {
+            logger.error("Error generating response with context and citations", e)
+            throw e
+        }
+    }
+
+    /**
      * Send generate request to Ollama API
      * @param prompt The full prompt to send
      * @return Generated text
