@@ -170,6 +170,51 @@ class OllamaLLMClient(
     }
 
     /**
+     * Generate text completion WITH context, chat history, AND explicit citation instructions
+     * @param question User's current question
+     * @param context Retrieved context from vector database
+     * @param chatHistory Previous conversation history
+     * @return LLM response text with citations
+     */
+    suspend fun generateWithContextHistoryAndCitations(
+        question: String,
+        context: String,
+        chatHistory: String,
+    ): String {
+        return try {
+            logger.info("Generating response WITH context, history, AND citations for question: $question")
+            logger.debug("Context length: ${context.length} chars, History length: ${chatHistory.length} chars")
+
+            val prompt = """
+                You are an AI assistant that answers questions based on the provided context and conversation history.
+                IMPORTANT: You MUST cite your sources from the knowledge base in the answer.
+
+                Instructions for citations:
+                1. Use ONLY the information from the context below to answer the question
+                2. After each fact or claim from the knowledge base, indicate the source number: [Source N]
+                3. If a sentence uses information from multiple sources, cite all of them: [Source 1, Source 2]
+                4. You can reference previous conversation naturally, but cite sources for new facts
+                5. If the context doesn't contain enough information, say so explicitly
+                6. At the end of your answer, provide a "Sources:" section listing knowledge base sources used
+
+                ${if (chatHistory.isNotEmpty()) "$chatHistory\n" else ""}Context from knowledge base:
+                $context
+
+                Current question: $question
+
+                Answer (with citations for facts from knowledge base):
+            """.trimIndent()
+
+            val response = sendGenerateRequest(prompt)
+            logger.info("Response generated with context, history, and citations (length: ${response.length} chars)")
+            response
+        } catch (e: Exception) {
+            logger.error("Error generating response with context, history, and citations", e)
+            throw e
+        }
+    }
+
+    /**
      * Send generate request to Ollama API
      * @param prompt The full prompt to send
      * @return Generated text

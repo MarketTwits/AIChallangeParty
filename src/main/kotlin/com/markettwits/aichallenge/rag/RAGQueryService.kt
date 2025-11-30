@@ -414,6 +414,110 @@ class RAGQueryService(
     }
 
     /**
+     * Execute RAG query with chat history context
+     * This method incorporates previous conversation into the response
+     *
+     * @param question User's current question
+     * @param chatHistory Previous conversation history as formatted string
+     * @param topK Number of chunks to retrieve (default: 5)
+     * @return RAGQueryResult with answer, retrieved chunks, and citation info
+     */
+    suspend fun queryWithRAGAndHistory(
+        question: String,
+        chatHistory: String,
+        topK: Int = 5,
+    ): RAGQueryResult {
+        logger.info("Processing RAG query WITH history and citations: $question")
+
+        // Step 1: Generate embedding for the question
+        logger.debug("Step 1: Generating embedding for question")
+        val questionEmbedding = try {
+            embeddingClient.generateEmbedding(question)
+        } catch (e: Exception) {
+            logger.error("Failed to generate embedding for question", e)
+            throw Exception("Failed to generate embedding: ${e.message}")
+        }
+
+        // Step 2: Search for similar chunks in vector store
+        logger.debug("Step 2: Searching for top $topK similar chunks")
+        val retrievedChunks = try {
+            vectorStore.search(database, questionEmbedding, topK)
+        } catch (e: Exception) {
+            logger.error("Failed to search vector store", e)
+            throw Exception("Failed to search vector store: ${e.message}")
+        }
+
+        if (retrievedChunks.isEmpty()) {
+            logger.warn("No chunks found in vector store")
+            return RAGQueryResult(
+                question = question,
+                answer = "No relevant information found in the knowledge base.",
+                retrievedChunks = emptyList(),
+                contextUsed = "",
+                mode = "rag-chat"
+            )
+        }
+
+        // Step 2.5: Rerank chunks using heading context boost
+        logger.debug("Step 2.5: Reranking chunks with heading context boost")
+        val rerankedChunks = relevanceFilter.rerankWithHeadingBoost(retrievedChunks, question)
+
+        // Step 2.6: Filter and rank chunks
+        logger.debug("Step 2.6: Filtering chunks by relevance")
+        val filterResult = relevanceFilter.filterAndRank(rerankedChunks, question)
+
+        // Cache filtered chunks for potential alternative requests
+        filteredChunksCache[question] = filterResult.filteredOutChunks
+
+        // Step 3: Format context from retrieved chunks with citations
+        val context = formatContextWithCitations(filterResult.relevantChunks)
+        logger.debug("Context formatted with citations from ${filterResult.relevantChunks.size} chunks")
+
+        // Step 4: Generate answer using LLM with context, history, AND citations
+        logger.debug("Step 4: Generating answer with LLM using context, history, and citations")
+        val answer = try {
+            llmClient.generateWithContextHistoryAndCitations(question, context, chatHistory)
+        } catch (e: Exception) {
+            logger.error("Failed to generate answer with context, history, and citations", e)
+            throw Exception("Failed to generate answer: ${e.message}")
+        }
+
+        // Step 5: Extract which sources were actually cited in the answer
+        val retrievedChunkInfo = filterResult.relevantChunks.map { chunk ->
+            RetrievedChunkInfo(
+                text = chunk.text,
+                sourceFile = chunk.sourceFile,
+                chunkIndex = chunk.chunkIndex,
+                similarity = chunk.similarity,
+                headingContext = chunk.headingContext,
+                isCited = false  // Will be updated after citation extraction
+            )
+        }
+
+        val citedSources = extractCitedSources(answer, retrievedChunkInfo)
+        val citedSourceKeys = citedSources.map { it.sourceFile to it.chunkIndex }.toSet()
+
+        // Mark which chunks were cited
+        val finalChunkInfo = retrievedChunkInfo.map { chunk ->
+            chunk.copy(isCited = (chunk.sourceFile to chunk.chunkIndex) in citedSourceKeys)
+        }
+
+        logger.info("RAG query with chat history completed, ${citedSourceKeys.size} sources cited")
+
+        return RAGQueryResult(
+            question = question,
+            answer = answer,
+            retrievedChunks = finalChunkInfo,
+            contextUsed = context,
+            mode = "rag-chat",
+            qualityScore = filterResult.qualityScore,
+            suggestion = filterResult.suggestion,
+            hasFilteredResults = filterResult.filteredOutChunks.isNotEmpty(),
+            alternativeChunksAvailable = filterResult.filteredOutChunks.isNotEmpty()
+        )
+    }
+
+    /**
      * Check if the RAG system is ready
      */
     suspend fun isReady(): Boolean {

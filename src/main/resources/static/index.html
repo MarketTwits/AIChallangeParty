@@ -456,6 +456,14 @@
             color: white;
             box-shadow: 0 4px 15px rgba(61, 82, 139, 0.3);
         }
+
+        .rotate-180 {
+            transform: rotate(180deg);
+        }
+
+        .rag-source-toggle:hover {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -476,8 +484,7 @@
                     <button class="nav-link text-sm font-medium active-tab" id="tab-training">Тренер</button>
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
                     <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
-                    <button class="nav-link text-sm font-medium" id="tab-mcp">MCP Agent</button>
-                    <button class="nav-link text-sm font-medium" id="tab-composition">🔗 MCP Композиция</button>
+                    <button class="nav-link text-sm font-medium" id="tab-rag">🤖 RAG Чат</button>
                     <button class="nav-link text-sm font-medium" id="tab-reminders">📋 Задачи</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
@@ -1003,347 +1010,127 @@
                     </div>
                 </div>
             </div>
-            <!-- MCP Orchestration Tab -->
-            <div class="tab-content" id="mcp-content">
+            <!-- RAG Chat Tab -->
+            <div class="tab-content" id="rag-content">
                 <div class="chat-container p-6 mb-8">
-                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🔀 MCP Оркестрация</h2>
-                    <p class="text-gray-600 mb-6">Интеллектуальная система с несколькими MCP серверами и автоматическим
-                        выбором инструментов через AI</p>
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🤖 RAG Чат с Памятью</h2>
+                    <p class="text-gray-600 mb-6">Умный диалог с базой знаний и историей разговоров</p>
 
-                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-4">
-                        <div class="flex gap-3 flex-wrap">
-                            <span class="badge" style="background: var(--primary-color); color: white;">Real JSON-RPC 2.0</span>
-                            <span class="badge"
-                                  style="background: var(--primary-light); color: white;">Claude AI Agent</span>
-                            <span class="badge" style="background: #f59e0b; color: white;">Cascade Tool Calls</span>
-                        </div>
-                    </div>
-
-                    <!-- MCP Servers & Tools Grid -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                        <!-- MCP Servers Status -->
-                        <div class="bg-white border border-gray-200 rounded-lg p-4">
-                            <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-color);">📡 MCP
-                                Серверы</h3>
-                            <div class="space-y-2" id="orch-servers-status">
-                                <div class="text-center text-gray-500 text-sm py-4">Загрузка...</div>
+                    <!-- Session Info -->
+                    <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                            <div class="text-center">
+                                <div class="font-semibold text-blue-700">Статус системы</div>
+                                <div class="text-gray-700 font-bold" id="rag-status">
+                                    <span class="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-1"></span>
+                                    Проверка...
+                                </div>
                             </div>
-                        </div>
-
-                        <!-- Available Tools -->
-                        <div class="bg-white border border-gray-200 rounded-lg p-4 lg:col-span-2">
-                            <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-color);">🛠️ Доступные
-                                инструменты</h3>
-                            <div class="mb-3">
-                                <input
-                                        class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
-                                        id="orch-tool-search"
-                                        placeholder="Поиск инструментов..."
-                                        style="focus:ring-color: var(--primary-color);"
-                                        type="text"
-                                >
+                            <div class="text-center">
+                                <div class="font-semibold text-green-700">ID сессии</div>
+                                <div class="text-gray-700 font-mono text-xs" id="rag-session-id">-</div>
                             </div>
-                            <div class="space-y-2 max-h-64 overflow-y-auto scroll-smooth" id="orch-tools-list">
-                                <div class="text-center text-gray-500 text-sm py-4">Загрузка...</div>
+                            <div class="text-center">
+                                <div class="font-semibold text-purple-700">Сообщений</div>
+                                <div class="text-gray-700 font-bold" id="rag-message-count">0</div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Orchestration Query Interface -->
-                    <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-                        <h3 class="text-lg font-semibold mb-3" style="color: var(--primary-color);">💬 Запрос к агенту
-                            оркестрации</h3>
-                        <p class="text-sm text-gray-600 mb-4">Агент автоматически выберет и выполнит нужные инструменты
-                            из разных MCP серверов</p>
-
-                        <!-- Example Queries -->
-                        <div class="mb-4">
-                            <p class="text-xs font-semibold text-gray-700 mb-2">Примеры запросов:</p>
-                            <div class="flex flex-wrap gap-2">
-                                <button class="orch-example-query px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-full text-xs hover:bg-blue-100 transition-colors">
-                                    Найди Kotlin проекты на GitHub и создай напоминание их изучить
-                                </button>
-                                <button class="orch-example-query px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-full text-xs hover:bg-green-100 transition-colors">
-                                    Список моих напоминаний и сохрани в файл
-                                </button>
-                                <button class="orch-example-query px-3 py-1.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-full text-xs hover:bg-purple-100 transition-colors">
-                                    Информация о JetBrains/kotlin и краткое резюме в summary.txt
-                                </button>
-                                <button class="orch-example-query px-3 py-1.5 bg-orange-50 text-orange-700 border border-orange-200 rounded-full text-xs hover:bg-orange-100 transition-colors">
-                                    Создай напоминание высокого приоритета проверить файлы
-                                </button>
+                    <!-- Chat Messages -->
+                    <div class="overflow-y-auto space-y-4 scroll-smooth mb-6" id="rag-messages"
+                         style="max-height: 500px;">
+                        <div class="flex items-start space-x-4 message">
+                            <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                                AI
                             </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <textarea
-                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent resize-none"
-                                    id="orch-query-input"
-                                    placeholder="Спроси меня о чем угодно! Я могу искать на GitHub, управлять напоминаниями и работать с файлами..."
-                                    rows="3"
-                                    style="focus:ring-color: var(--primary-color);"
-                            ></textarea>
-                        </div>
-                        <button
-                                class="w-full send-button text-white font-bold py-3 px-6 rounded-lg transition-all flex items-center justify-center space-x-2"
-                                id="orch-execute-btn"
-                        >
-                            <span>🚀 Выполнить оркестрацию</span>
-                        </button>
-                    </div>
-
-                    <!-- Results Container -->
-                    <div class="hidden" id="orch-results-container">
-                        <div class="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-                            <div class="flex justify-between items-start mb-4">
-                                <h3 class="text-xl font-bold" style="color: var(--primary-color);">📊 Результаты
-                                    выполнения</h3>
-                                <div class="flex gap-2">
-                                    <span class="badge" id="orch-exec-time" style="background: #10b981; color: white;">0ms</span>
-                                    <span class="badge" id="orch-token-usage"
-                                          style="background: #3b82f6; color: white;">0 tokens</span>
-                                </div>
-                            </div>
-
-                            <!-- Execution Steps -->
-                            <div class="mb-6">
-                                <h4 class="text-base font-semibold text-gray-700 mb-3">🔄 Шаги выполнения</h4>
-                                <div class="space-y-2" id="orch-execution-steps">
-                                    <!-- Steps will be inserted here -->
-                                </div>
-                            </div>
-
-                            <!-- Servers Used -->
-                            <div class="mb-6">
-                                <h4 class="text-base font-semibold text-gray-700 mb-3">🖥️ Использованные серверы</h4>
-                                <div class="flex flex-wrap gap-2" id="orch-servers-used">
-                                    <!-- Server badges will be inserted here -->
-                                </div>
-                            </div>
-
-                            <!-- Final Response -->
-                            <div>
-                                <h4 class="text-base font-semibold text-gray-700 mb-3">✨ Финальный ответ</h4>
-                                <div class="p-4 bg-gray-50 rounded-lg border border-gray-200 whitespace-pre-wrap text-sm"
-                                     id="orch-final-response">
-                                    <!-- Response will be inserted here -->
+                            <div class="flex-1">
+                                <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
+                                <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
+                                    <p class="text-gray-700 leading-relaxed mb-4">
+                                        Привет! 👋 Я могу отвечать на вопросы на основе базы знаний и запоминать историю
+                                        нашего разговора.
+                                    </p>
+                                    <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                        <p class="font-semibold mb-3 text-sm" style="color: var(--primary-color);">
+                                            💡 Все ответы включают ссылки на источники
+                                        </p>
+                                        <p class="text-sm text-gray-600">
+                                            Задайте любой вопрос из базы знаний - я найду релевантную информацию и
+                                            процитирую источники.
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Loading Indicator -->
-                    <div class="hidden bg-white border border-gray-200 rounded-lg p-8 text-center mb-6"
-                         id="orch-loading-indicator">
-                        <div class="loading-dots flex justify-center space-x-2 mb-4">
-                            <span class="w-3 h-3 rounded-full"></span>
-                            <span class="w-3 h-3 rounded-full"></span>
-                            <span class="w-3 h-3 rounded-full"></span>
-                        </div>
-                        <p class="text-gray-600 font-medium">Обработка вашего запроса...</p>
-                        <p class="text-gray-500 text-sm mt-2">Агент выбирает и выполняет инструменты из MCP серверов</p>
-                    </div>
-                </div>
-            </div>
-            <!-- MCP Composition Tab -->
-            <div class="tab-content" id="composition-content">
-                <div class="chat-container p-6 mb-8">
-                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🔗 MCP Композиция
-                        инструментов</h2>
-                    <p class="text-gray-600 mb-6">Интеллектуальная система для каскадных вызовов MCP инструментов: поиск
-                        → суммаризация → сохранение</p>
-
-                    <!-- Tools Overview -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
-                            <i class="fas fa-tools mr-2"></i>Доступные инструменты
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div class="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-4">
-                                <div class="flex items-center mb-3">
-                                    <div class="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-                                        <i class="fas fa-search text-white"></i>
-                                    </div>
-                                    <h4 class="font-semibold text-gray-800">search_docs</h4>
-                                </div>
-                                <p class="text-sm text-gray-600 mb-2">Поиск текста в документации и исходном коде</p>
-                                <div class="text-xs text-gray-500">
-                                    Параметры: query, path, file_types, max_results
-                                </div>
+                    <div class="hidden mb-6" id="rag-loading">
+                        <div class="flex items-start space-x-4">
+                            <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                                AI
                             </div>
-
-                            <div class="bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
-                                <div class="flex items-center mb-3">
-                                    <div class="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
-                                        <i class="fas fa-compress-alt text-white"></i>
-                                    </div>
-                                    <h4 class="font-semibold text-gray-800">summarize</h4>
-                                </div>
-                                <p class="text-sm text-gray-600 mb-2">Суммаризация текста с использованием AI</p>
-                                <div class="text-xs text-gray-500">
-                                    Параметры: text, style, max_length, language
-                                </div>
-                            </div>
-
-                            <div class="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-4">
-                                <div class="flex items-center mb-3">
-                                    <div class="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
-                                        <i class="fas fa-save text-white"></i>
-                                    </div>
-                                    <h4 class="font-semibold text-gray-800">save_to_file</h4>
-                                </div>
-                                <p class="text-sm text-gray-600 mb-2">Сохранение контента в файл</p>
-                                <div class="text-xs text-gray-500">
-                                    Параметры: content, file_path, create_dirs, append
+                            <div class="assistant-message p-4 rounded-2xl rounded-tl-none">
+                                <div class="loading-dots flex space-x-2">
+                                    <span class="w-3 h-3 rounded-full"></span>
+                                    <span class="w-3 h-3 rounded-full"></span>
+                                    <span class="w-3 h-3 rounded-full"></span>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <!-- Example Requests -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
-                            <i class="fas fa-lightbulb mr-2"></i>Примеры запросов
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
-                                    onclick="setCompositionExample('Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл architecture_summary.txt')">
-                                <div class="font-semibold mb-1 text-gray-800">📋 Анализ архитектуры</div>
-                                <div class="text-sm text-gray-600">Поиск → Суммаризация → Сохранение</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
-                                    onclick="setCompositionExample('Найди все задачи в проекте, определи критичные и создай отчет critical_tasks.md')">
-                                <div class="font-semibold mb-1 text-gray-800">🎯 Анализ задач</div>
-                                <div class="text-sm text-gray-600">Поиск → Фильтрация → Сохранение</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
-                                    onclick="setCompositionExample('Проанализируй файлы README этого проекта и создай краткое описание functionality.md')">
-                                <div class="font-semibold mb-1 text-gray-800">📖 Документация проекта</div>
-                                <div class="text-sm text-gray-600">Поиск → Анализ → Сохранение</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-all"
-                                    onclick="setCompositionExample('Найди информацию о запуске проекта и создай инструкции setup_guide.md')">
-                                <div class="font-semibold mb-1 text-gray-800">🚀 Инструкция по установке</div>
-                                <div class="text-sm text-gray-600">Поиск → Суммаризация → Сохранение</div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- GitHub Repository Analysis -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
-                            <i class="fab fa-github mr-2"></i>Анализ GitHub репозиториев
-                        </h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
-                                    onclick="setCompositionExample('Создай полный отчет о репозитории microsoft/vscode в HTML формате, включая структуру файлов, коммиты и issues')">
-                                <div class="font-semibold mb-1 text-gray-800">🔍 Полный анализ репозитория</div>
-                                <div class="text-sm text-gray-600">GitHub анализ → HTML отчет</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
-                                    onclick="setCompositionExample('Проанализируй репозиторий facebook/react, найди основные языки программирования и создай краткий отчет в Markdown')">
-                                <div class="font-semibold mb-1 text-gray-800">📊 Анализ технологий</div>
-                                <div class="text-sm text-gray-600">GitHub анализ → Markdown отчет</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
-                                    onclick="setCompositionExample('Изучи активность коммитов в репозитории torvalds/linux за последние 100 коммитов и создай JSON отчет')">
-                                <div class="font-semibold mb-1 text-gray-800">📈 Активность разработки</div>
-                                <div class="text-sm text-gray-600">GitHub коммиты → JSON отчет</div>
-                            </button>
-                            <button class="text-left p-4 border-2 border-gray-200 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-all"
-                                    onclick="setCompositionExample('Проанализируй issues в репозитории rails/rails, определи приоритеты и создай отчет в Markdown')">
-                                <div class="font-semibold mb-1 text-gray-800">🐛 Анализ проблем</div>
-                                <div class="text-sm text-gray-600">GitHub issues → Markdown отчет</div>
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Request Form -->
-                    <div class="mb-8">
-                        <h3 class="text-xl font-semibold mb-4" style="color: var(--primary-color);">
-                            <i class="fas fa-terminal mr-2"></i>Выполнить композицию
-                        </h3>
-                        <div class="bg-white border border-gray-200 rounded-lg p-6">
-                            <div class="mb-4">
-                                <label class="block text-sm font-medium text-gray-700 mb-2">
-                                    Ваш запрос:
-                                </label>
-                                <textarea
-                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                        id="composition-request-input"
-                                        placeholder="Например: Найди документацию по архитектуре проекта, суммаризируй её и сохрани в файл"
-                                        rows="3"></textarea>
-                            </div>
-                            <div class="flex items-center space-x-4">
+                    <!-- Input Area -->
+                    <div class="border-t border-gray-200 pt-6">
+                        <form class="space-y-4" id="rag-form">
+                            <div class="flex space-x-3">
+                                <input
+                                        autocomplete="off"
+                                        class="flex-1 px-5 py-4 rounded-xl font-medium"
+                                        id="rag-input"
+                                        placeholder="Задайте любой вопрос из базы знаний..."
+                                        type="text"
+                                />
                                 <button
-                                        class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-all flex items-center space-x-2"
-                                        id="composition-execute-btn"
-                                        onclick="executeComposition()">
-                                    <i class="fas fa-play"></i>
-                                    <span id="composition-execute-text">Выполнить</span>
-                                </button>
-                                <button
-                                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-lg font-medium transition-all"
-                                        onclick="clearCompositionResults()">
-                                    <i class="fas fa-eraser mr-2"></i>Очистить
+                                        class="send-button text-white px-8 py-4 rounded-xl font-bold flex items-center justify-center space-x-2"
+                                        type="submit"
+                                >
+                                    <span>Отправить</span>
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"
+                                              stroke-width="2.5"></path>
+                                    </svg>
                                 </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Loading State -->
-                    <div class="hidden mb-8" id="composition-loading">
-                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                            <div class="text-blue-600">
-                                <i class="fas fa-cog fa-spin text-3xl mb-4"></i>
-                                <div class="text-lg font-semibold mb-2">Выполняю композицию инструментов...</div>
-                                <div class="text-sm">Анализирую запрос и создаю план выполнения</div>
+                            <div class="flex flex-wrap gap-2">
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Что такое свиноводство?"
+                                        type="button">
+                                    🐷 Что такое свиноводство?
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Как разводить свиней?"
+                                        type="button">
+                                    🏭 Как разводить свиней?
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Расскажи о животноводстве"
+                                        type="button">
+                                    🌾 Расскажи о животноводстве
+                                </button>
                             </div>
-                        </div>
-                    </div>
-
-                    <!-- Results Section -->
-                    <div class="hidden space-y-6" id="composition-results">
-                        <!-- Plan -->
-                        <div>
-                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
-                                <i class="fas fa-clipboard-list mr-2 text-blue-600"></i>План выполнения
-                            </h3>
-                            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                <div class="text-gray-700 mb-3 font-medium" id="composition-plan-description"></div>
-                                <div class="space-y-2" id="composition-plan-steps"></div>
+                            <div class="mt-4">
+                                <button
+                                        class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2"
+                                        id="rag-clear-btn"
+                                        type="button"
+                                >
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"
+                                              stroke-width="2"></path>
+                                    </svg>
+                                    <span>Очистить историю</span>
+                                </button>
                             </div>
-                        </div>
-
-                        <!-- Execution Results -->
-                        <div>
-                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
-                                <i class="fas fa-tasks mr-2 text-green-600"></i>Результаты выполнения
-                            </h3>
-                            <div class="space-y-3" id="composition-execution-results"></div>
-                        </div>
-
-                        <!-- Final Output -->
-                        <div>
-                            <h3 class="text-xl font-semibold mb-3 text-gray-800">
-                                <i class="fas fa-file-alt mr-2 text-purple-600"></i>Финальный результат
-                            </h3>
-                            <div class="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                <pre class="text-gray-700 whitespace-pre-wrap font-mono text-sm"
-                                     id="composition-final-output"></pre>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Error State -->
-                    <div class="hidden mb-8" id="composition-error">
-                        <div class="bg-red-50 border border-red-200 rounded-lg p-6">
-                            <div class="text-red-700">
-                                <i class="fas fa-exclamation-triangle text-2xl mb-3"></i>
-                                <div class="text-lg font-semibold mb-2">Ошибка выполнения</div>
-                                <div class="text-sm" id="composition-error-message"></div>
-                            </div>
-                        </div>
+                        </form>
                     </div>
                 </div>
             </div>

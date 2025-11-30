@@ -28,6 +28,23 @@ data class RAGQueryRequest(val question: String, val topK: Int = 5)
 @Serializable
 data class RAGCompareRequest(val question: String, val topK: Int = 5)
 
+@Serializable
+data class RAGChatRequest(
+    val sessionId: String,
+    val message: String,
+    val topK: Int = 5,
+)
+
+@Serializable
+data class RAGChatResponse(
+    val sessionId: String,
+    val question: String,
+    val answer: String,
+    val sources: List<RetrievedChunkInfo>,
+    val messageCount: Int,
+    val timestamp: Long = System.currentTimeMillis(),
+)
+
 fun Application.configureRouting(
     sessionManager: SessionManager,
     apiKey: String,
@@ -68,6 +85,12 @@ fun Application.configureRouting(
     val vectorStore = VectorStore()
     val ragQueryService = RAGQueryService(database, embeddingClient, llmClient, vectorStore)
     val ragComparisonService = RAGComparisonService(ragQueryService)
+
+    // Initialize Chat History Service (Day 19)
+    val chatHistoryService = ChatHistoryService(
+        maxMessagesPerSession = 20,
+        sessionTimeoutMinutes = 60
+    )
 
     // Flag to track if knowledge base is built
     var isKnowledgeBaseBuilt = false
@@ -1298,6 +1321,133 @@ fun Application.configureRouting(
                     contentType = ContentType.Application.Json,
                     status = HttpStatusCode.InternalServerError,
                     text = """{"error":"${e.message}"}"""
+                )
+            }
+        }
+
+        // RAG Chat Endpoints (Day 19)
+        post("/chat/rag") {
+            try {
+                val request = call.receive<RAGChatRequest>()
+
+                logger.info("RAG chat request from session ${request.sessionId}: ${request.message}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                // Add user message to history
+                chatHistoryService.addUserMessage(request.sessionId, request.message)
+
+                // Get chat history context
+                val historyContext = chatHistoryService.getHistoryContext(request.sessionId, lastN = 5)
+
+                // Query RAG with history
+                val result = ragQueryService.queryWithRAGAndHistory(
+                    question = request.message,
+                    chatHistory = historyContext,
+                    topK = request.topK
+                )
+
+                // Add assistant response to history
+                chatHistoryService.addAssistantMessage(
+                    sessionId = request.sessionId,
+                    message = result.answer,
+                    sources = result.retrievedChunks
+                )
+
+                // Get current message count
+                val history = chatHistoryService.getHistory(request.sessionId)
+
+                val response = RAGChatResponse(
+                    sessionId = request.sessionId,
+                    question = request.message,
+                    answer = result.answer,
+                    sources = result.retrievedChunks,
+                    messageCount = history.size
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG chat request", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/rag/history/{sessionId}") {
+            try {
+                val sessionId = call.parameters["sessionId"] ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Session ID is required")
+                )
+
+                val history = chatHistoryService.getHistory(sessionId)
+                val stats = chatHistoryService.getSessionStats(sessionId)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "sessionId" to sessionId,
+                        "history" to history,
+                        "stats" to (stats ?: mapOf<String, Any>())
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting chat history", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/chat/rag/clear") {
+            try {
+                val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+
+                chatHistoryService.clearSession(sessionId)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "status" to "cleared",
+                        "sessionId" to sessionId
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error clearing RAG chat session", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/rag/sessions") {
+            try {
+                val sessions = chatHistoryService.getActiveSessions()
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "sessions" to sessions,
+                        "count" to sessions.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting active sessions", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
                 )
             }
         }
