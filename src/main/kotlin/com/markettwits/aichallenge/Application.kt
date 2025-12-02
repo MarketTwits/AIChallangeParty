@@ -89,7 +89,16 @@ fun main() {
     }
 
     // Check if RAG is ready for documentation
-    val isRagReady = runBlocking { ragQueryService.isReady() }
+    val isRagReady = runBlocking {
+        try {
+            ragQueryService.isReady()
+        } catch (e: Exception) {
+            println("⚠️  RAG system unavailable: ${e.message}")
+            println("   Code review will work without RAG context")
+            false
+        }
+    }
+
     if (isRagReady) {
         println("✅ RAG system is ready - documentation indexed")
         val stats = ragQueryService.getStats()
