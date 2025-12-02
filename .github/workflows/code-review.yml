@@ -128,37 +128,35 @@ jobs:
 
           echo "Posting comment to PR #${PR_NUMBER}..."
 
-          # Create comment body file
-          cat > /tmp/comment.md << 'EOF'
-  $MARKDOWN
-  EOF
-  
-  # Post comment using GitHub CLI
-  gh pr comment ${PR_NUMBER} --body-file /tmp/comment.md
-  
-  echo "Comment posted successfully!"
+          # Save markdown to file
+          echo "$MARKDOWN" > /tmp/comment.md
 
-- name: Check Review Results
-  if: always()
-  env:
-    REVIEW_ID: ${{ steps.review.outputs.review_id }}
-  run: |
-    echo "=== Review Summary ==="
-    RESULT=$(curl -s http://localhost:8080/code-review/result/${REVIEW_ID})
-    echo $RESULT | jq '.summary'
-    
-    CRITICAL_COUNT=$(echo $RESULT | jq '.summary.bySeverity.CRITICAL // 0')
-    HIGH_COUNT=$(echo $RESULT | jq '.summary.bySeverity.HIGH // 0')
-    
-    if [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
-      echo "⚠️  Found $CRITICAL_COUNT critical and $HIGH_COUNT high severity issues"
-      echo "Please review and address these issues before merging"
-    else
-      echo "✅ No critical or high severity issues found"
-    fi
+          # Post comment using GitHub CLI
+          gh pr comment ${PR_NUMBER} --body-file /tmp/comment.md
 
-- name: Server Logs (if failed)
-  if: failure()
-  run: |
-    echo "=== Server Logs ==="
-    cat /tmp/app.log || echo "No logs available"
+          echo "Comment posted successfully!"
+
+      - name: Check Review Results
+        if: always()
+        env:
+          REVIEW_ID: ${{ steps.review.outputs.review_id }}
+        run: |
+          echo "=== Review Summary ==="
+          RESULT=$(curl -s http://localhost:8080/code-review/result/${REVIEW_ID})
+          echo $RESULT | jq '.summary'
+
+          CRITICAL_COUNT=$(echo $RESULT | jq '.summary.bySeverity.CRITICAL // 0')
+          HIGH_COUNT=$(echo $RESULT | jq '.summary.bySeverity.HIGH // 0')
+
+          if [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+            echo "⚠️  Found $CRITICAL_COUNT critical and $HIGH_COUNT high severity issues"
+            echo "Please review and address these issues before merging"
+          else
+            echo "✅ No critical or high severity issues found"
+          fi
+
+      - name: Server Logs (if failed)
+        if: failure()
+        run: |
+          echo "=== Server Logs ==="
+          cat /tmp/app.log || echo "No logs available"
