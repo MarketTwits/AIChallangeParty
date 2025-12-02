@@ -771,26 +771,26 @@ function initReasoningTab() {
     const tabTraining = document.getElementById('tab-training');
     const tabReasoning = document.getElementById('tab-reasoning');
     const tabModels = document.getElementById('tab-models');
-    const tabMcp = document.getElementById('tab-mcp');
+    const tabRag = document.getElementById('tab-rag');
     const trainingContent = document.getElementById('training-content');
     const reasoningContent = document.getElementById('reasoning-content');
     const modelsContent = document.getElementById('models-content');
-    const mcpContent = document.getElementById('mcp-content');
+    const ragContent = document.getElementById('rag-content');
 
     console.log('Elements:', {
         tabTraining: !!tabTraining,
         tabReasoning: !!tabReasoning,
         tabModels: !!tabModels,
-        tabMcp: !!tabMcp,
+        tabRag: !!tabRag,
         trainingContent: !!trainingContent,
         reasoningContent: !!reasoningContent,
         modelsContent: !!modelsContent,
-        mcpContent: !!mcpContent
+        ragContent: !!ragContent
     });
 
-    if (!tabTraining || !tabReasoning || !tabModels || !tabMcp || !trainingContent || !reasoningContent || !modelsContent || !mcpContent) {
+    if (!tabTraining || !tabReasoning || !tabModels || !tabRag || !trainingContent || !reasoningContent || !modelsContent || !ragContent) {
         console.error('Tab elements not found!', {
-            tabTraining, tabReasoning, tabModels, tabMcp, trainingContent, reasoningContent, modelsContent, mcpContent
+            tabTraining, tabReasoning, tabModels, tabRag, trainingContent, reasoningContent, modelsContent, ragContent
         });
         return;
     }
@@ -801,11 +801,11 @@ function initReasoningTab() {
         tabTraining.classList.remove('active-tab');
         tabReasoning.classList.remove('active-tab');
         tabModels.classList.remove('active-tab');
-        tabMcp.classList.remove('active-tab');
+        tabRag.classList.remove('active-tab');
         trainingContent.classList.remove('active');
         reasoningContent.classList.remove('active');
         modelsContent.classList.remove('active');
-        mcpContent.classList.remove('active');
+        ragContent.classList.remove('active');
 
         if (tab === 'training') {
             tabTraining.classList.add('active-tab');
@@ -816,9 +816,13 @@ function initReasoningTab() {
         } else if (tab === 'models') {
             tabModels.classList.add('active-tab');
             modelsContent.classList.add('active');
-        } else if (tab === 'mcp') {
-            tabMcp.classList.add('active-tab');
-            mcpContent.classList.add('active');
+        } else if (tab === 'rag') {
+            tabRag.classList.add('active-tab');
+            ragContent.classList.add('active');
+            // Initialize RAG chat on first load
+            if (typeof initRagChat === 'function') {
+                initRagChat();
+            }
         }
         console.log('Tab switched successfully');
     }
@@ -835,9 +839,9 @@ function initReasoningTab() {
         console.log('Models tab clicked');
         switchTab('models');
     });
-    tabMcp.addEventListener('click', () => {
-        console.log('MCP tab clicked');
-        switchTab('mcp');
+    tabRag.addEventListener('click', () => {
+        console.log('RAG tab clicked');
+        switchTab('rag');
     });
 
     console.log('Event listeners attached successfully');
@@ -2569,49 +2573,304 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Add tab switching for composition
-    const compositionTab = document.getElementById('tab-composition');
-    if (compositionTab) {
-        compositionTab.addEventListener('click', () => {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active-tab');
-            });
-
-            // Show composition tab
-            document.getElementById('composition-content').classList.add('active');
-            compositionTab.classList.add('active-tab');
-        });
-    }
-
-    // Add tab switching for MCP orchestration
-    const mcpTab = document.getElementById('tab-mcp');
-    if (mcpTab) {
-        console.log('MCP tab found, attaching click handler');
-        mcpTab.addEventListener('click', () => {
-            console.log('MCP tab clicked!');
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            document.querySelectorAll('.nav-link').forEach(link => {
-                link.classList.remove('active-tab');
-            });
-
-            // Show MCP orchestration tab
-            document.getElementById('mcp-content').classList.add('active');
-            mcpTab.classList.add('active-tab');
-
-            // Initialize orchestration when tab is opened
-            console.log('Calling initializeOrchestrationTab()');
-            initializeOrchestrationTab();
-        });
-    } else {
-        console.error('MCP tab #tab-mcp not found!');
-    }
 
     console.log('✅ DOMContentLoaded complete - all event listeners attached');
+});
+
+// ============================================
+// RAG Chat Functionality
+// ============================================
+
+let ragSessionId = localStorage.getItem('ragChatSessionId');
+let ragInitialized = false;
+
+if (!ragSessionId) {
+    ragSessionId = 'session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('ragChatSessionId', ragSessionId);
+}
+
+function initRagChat() {
+    if (ragInitialized) return;
+    ragInitialized = true;
+
+    console.log('Initializing RAG chat...');
+
+    const ragSessionIdEl = document.getElementById('rag-session-id');
+    const ragForm = document.getElementById('rag-form');
+    const ragInput = document.getElementById('rag-input');
+    const ragMessages = document.getElementById('rag-messages');
+    const ragLoading = document.getElementById('rag-loading');
+    const ragClearBtn = document.getElementById('rag-clear-btn');
+    const ragStatusEl = document.getElementById('rag-status');
+    const ragMessageCountEl = document.getElementById('rag-message-count');
+    const ragQuickPrompts = document.querySelectorAll('[data-rag-question]');
+
+    if (ragSessionIdEl) {
+        ragSessionIdEl.textContent = ragSessionId;
+    }
+
+    // Check RAG system status
+    async function checkRagStatus() {
+        try {
+            const response = await fetch('/rag/status');
+            const data = await response.json();
+
+            if (ragStatusEl) {
+                if (data.ready) {
+                    ragStatusEl.innerHTML = `
+                        <span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+                        Готов (${data.totalChunks} чанков)
+                    `;
+                } else {
+                    ragStatusEl.innerHTML = `
+                        <span class="inline-block w-2 h-2 bg-red-400 rounded-full mr-1"></span>
+                        Не готов
+                    `;
+                }
+            }
+        } catch (error) {
+            console.error('Error checking RAG status:', error);
+            if (ragStatusEl) {
+                ragStatusEl.innerHTML = `
+                    <span class="inline-block w-2 h-2 bg-red-400 rounded-full mr-1"></span>
+                    Ошибка
+                `;
+            }
+        }
+    }
+
+    // Add message to chat
+    function addRagMessage(role, content, sources = []) {
+        if (!ragMessages) return;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'flex items-start space-x-4 message';
+
+        if (role === 'user') {
+            messageDiv.innerHTML = `
+                <div class="w-10 h-10"></div>
+                <div class="flex-1 flex justify-end">
+                    <div class="user-message p-4 rounded-2xl rounded-tr-none max-w-2xl text-white">
+                        <p>${escapeHtml(content)}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            const sourcesHtml = sources.length > 0 ? `
+                <div class="mt-4 pt-4 border-t border-gray-200">
+                    <p class="text-xs font-semibold mb-2" style="color: var(--primary-color);">ИСТОЧНИКИ (${sources.length}):</p>
+                    <div class="space-y-2">
+                        ${sources.map((source, idx) => `
+                            <div class="bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
+                                <button class="rag-source-toggle w-full text-left p-3 hover:bg-blue-100 transition-colors" data-source-idx="${idx}">
+                                    <div class="flex items-center justify-between mb-2">
+                                        <span class="inline-block px-2 py-1 bg-${source.isCited ? 'green' : 'gray'}-500 text-white rounded text-xs font-mono">
+                                            Источник ${idx + 1}
+                                        </span>
+                                        <span class="text-xs" style="color: var(--primary-color);">${source.sourceFile}</span>
+                                        <span class="text-xs text-blue-600">${(source.similarity * 100).toFixed(1)}%</span>
+                                        ${source.isCited ? '<span class="text-xs text-green-600">✓ Цитировано</span>' : ''}
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-xs text-gray-600 flex-1">${escapeHtml(source.text.substring(0, 100))}${source.text.length > 100 ? '...' : ''}</p>
+                                        <svg class="w-4 h-4 text-gray-500 ml-2 transform transition-transform rag-source-chevron-${idx}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </div>
+                                </button>
+                                <div class="rag-source-content px-3 pb-3 hidden" data-source-content="${idx}">
+                                    <div class="bg-white rounded p-3 border border-blue-200">
+                                        <p class="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">${escapeHtml(source.text)}</p>
+                                        ${source.headingContext ? `<p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-100">📌 Контекст: ${escapeHtml(source.headingContext)}</p>` : ''}
+                                    </div>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : '';
+
+            messageDiv.innerHTML = `
+                <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                    AI
+                </div>
+                <div class="flex-1">
+                    <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
+                    <div class="assistant-message p-4 rounded-2xl rounded-tl-none">
+                        <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(content)}</p>
+                        ${sourcesHtml}
+                    </div>
+                </div>
+            `;
+        }
+
+        ragMessages.appendChild(messageDiv);
+        ragMessages.scrollTop = ragMessages.scrollHeight;
+
+        // Add click handlers for source toggles
+        if (role === 'assistant' && sources.length > 0) {
+            setTimeout(() => {
+                messageDiv.querySelectorAll('.rag-source-toggle').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const idx = btn.getAttribute('data-source-idx');
+                        const content = messageDiv.querySelector(`[data-source-content="${idx}"]`);
+                        const chevron = messageDiv.querySelector(`.rag-source-chevron-${idx}`);
+
+                        if (content && chevron) {
+                            content.classList.toggle('hidden');
+                            chevron.classList.toggle('rotate-180');
+                        }
+                    });
+                });
+            }, 0);
+        }
+
+        if (ragMessageCountEl) {
+            const count = parseInt(ragMessageCountEl.textContent || '0') + 1;
+            ragMessageCountEl.textContent = count;
+        }
+    }
+
+    // Send message
+    async function sendRagMessage(message) {
+        if (!message.trim() || !ragInput || !ragLoading) return;
+
+        // Add user message
+        addRagMessage('user', message);
+
+        // Clear input and disable
+        ragInput.value = '';
+        ragInput.disabled = true;
+
+        // Show loading
+        ragLoading.classList.remove('hidden');
+
+        try {
+            const response = await fetch('/chat/rag', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    sessionId: ragSessionId,
+                    message: message,
+                    topK: 5
+                })
+            });
+
+            ragLoading.classList.add('hidden');
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Request failed');
+            }
+
+            const data = await response.json();
+
+            // Add assistant message with sources
+            addRagMessage('assistant', data.answer, data.sources);
+
+            // Update message count
+            if (ragMessageCountEl && data.messageCount) {
+                ragMessageCountEl.textContent = data.messageCount;
+            }
+
+        } catch (error) {
+            ragLoading.classList.add('hidden');
+            console.error('Error sending message:', error);
+            addRagMessage('assistant', `Ошибка: ${error.message}`, []);
+        } finally {
+            ragInput.disabled = false;
+            ragInput.focus();
+        }
+    }
+
+    // Clear chat history
+    async function clearRagHistory() {
+        if (!confirm('Вы уверены, что хотите очистить историю чата?')) {
+            return;
+        }
+
+        try {
+            const response = await fetch('/chat/rag/clear', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({sessionId: ragSessionId})
+            });
+
+            if (response.ok && ragMessages && ragMessageCountEl) {
+                // Clear UI
+                ragMessages.innerHTML = `
+                    <div class="flex items-start space-x-4 message">
+                        <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                            AI
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
+                            <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
+                                <p class="text-gray-700 leading-relaxed mb-4">
+                                    История очищена! Начните новый диалог.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                ragMessageCountEl.textContent = '0';
+            }
+        } catch (error) {
+            console.error('Error clearing history:', error);
+            alert('Не удалось очистить историю: ' + error.message);
+        }
+    }
+
+    // Escape HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Event listeners
+    if (ragForm) {
+        ragForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (ragInput) {
+                sendRagMessage(ragInput.value);
+            }
+        });
+    }
+
+    if (ragClearBtn) {
+        ragClearBtn.addEventListener('click', clearRagHistory);
+    }
+
+    if (ragQuickPrompts) {
+        ragQuickPrompts.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const question = btn.getAttribute('data-rag-question');
+                if (question && ragInput) {
+                    ragInput.value = question;
+                    if (ragForm) {
+                        ragForm.dispatchEvent(new Event('submit'));
+                    }
+                }
+            });
+        });
+    }
+
+    // Initial status check
+    checkRagStatus();
+    setInterval(checkRagStatus, 10000); // Check every 10 seconds
+
+    console.log('RAG chat initialized successfully');
+}
+
+// Initialize RAG chat when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+    // Check if RAG tab is active and initialize if needed
+    const ragTab = document.getElementById('tab-rag');
+    const ragContent = document.getElementById('rag-content');
+
+    if (ragContent && ragContent.classList.contains('active')) {
+        initRagChat();
+    }
 });

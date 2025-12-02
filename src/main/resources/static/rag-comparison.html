@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>RAG Comparison - День 16</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .fade-in {
+            animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen p-4">
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="bg-white rounded-lg shadow-xl p-6 mb-6">
+        <h1 class="text-4xl font-bold text-gray-800 mb-2">🔍 RAG Comparison & Citations Tool</h1>
+        <p class="text-gray-600">День 18: Сравнение ответов с RAG, без RAG и с ЦИТАТАМИ</p>
+        <div class="mt-4 flex items-center space-x-4">
+            <div class="flex items-center" id="status-indicator">
+                <div class="w-3 h-3 rounded-full bg-gray-400 mr-2"></div>
+                <span class="text-sm text-gray-600">Проверка системы...</span>
+            </div>
+            <div class="text-sm text-gray-600" id="stats"></div>
+        </div>
+    </div>
+
+    <!-- Input Form -->
+    <div class="bg-white rounded-lg shadow-xl p-6 mb-6">
+        <label class="block text-gray-700 font-semibold mb-2">Ваш вопрос:</label>
+        <div class="flex space-x-4">
+            <input
+                    class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    id="question-input"
+                    onkeypress="if(event.key === 'Enter') compareRAG()"
+                    placeholder="Например: Какие породы свиней существуют?"
+                    type="text"
+            />
+            <button
+                    class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition duration-200 shadow-md hover:shadow-lg"
+                    id="compare-btn"
+                    onclick="compareRAG()"
+            >
+                🚀 Сравнить
+            </button>
+        </div>
+
+        <!-- Quick Questions -->
+        <div class="mt-4">
+            <p class="text-sm text-gray-600 mb-2">Быстрые вопросы:</p>
+            <div class="flex flex-wrap gap-2">
+                <button class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full text-sm transition"
+                        onclick="setQuestion('Что такое анатомия животных?')">
+                    Анатомия
+                </button>
+                <button class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full text-sm transition"
+                        onclick="setQuestion('Какие породы свиней существуют?')">
+                    Породы свиней
+                </button>
+                <button class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full text-sm transition"
+                        onclick="setQuestion('Как правильно кормить животных?')">
+                    Кормление
+                </button>
+                <button class="px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full text-sm transition"
+                        onclick="setQuestion('Какие особенности у крупного рогатого скота?')">
+                    КРС
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div class="hidden bg-white rounded-lg shadow-xl p-8 mb-6 text-center" id="loading">
+        <div class="loading"></div>
+        <p class="text-gray-600 mt-4">Обработка запроса... (это может занять 2-3 минуты)</p>
+        <p class="text-sm text-gray-500 mt-2">Генерируем два ответа: с RAG и без RAG</p>
+    </div>
+
+    <!-- Results -->
+    <div class="hidden" id="results">
+        <!-- Analysis Summary -->
+        <div class="bg-white rounded-lg shadow-xl p-6 mb-6 fade-in" id="analysis-summary"></div>
+
+        <!-- Comparison -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <!-- With RAG -->
+            <div class="bg-white rounded-lg shadow-xl p-6 fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-green-600">✅ С RAG</h2>
+                    <span class="text-sm text-gray-500" id="rag-length"></span>
+                </div>
+
+                <!-- Quality Score Badge -->
+                <div class="mb-4" id="quality-badge"></div>
+
+                <!-- Suggestion Box -->
+                <div class="mb-4 hidden" id="suggestion-box"></div>
+
+                <div class="prose max-w-none text-gray-700 mb-4" id="rag-answer"></div>
+
+                <div class="border-t pt-4 mt-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">📚 Источники:</h3>
+                    <div class="text-sm text-gray-600" id="rag-sources"></div>
+                </div>
+
+                <div class="mt-3 text-sm text-gray-500">
+                    <span id="rag-chunks"></span> • <span id="rag-context"></span>
+                </div>
+
+                <!-- Alternative Chunks Button -->
+                <div class="mt-4" id="alternatives-section">
+                    <button
+                            class="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition"
+                            onclick="loadAlternativeChunks()"
+                    >
+                        🔄 Альтернативные
+                    </button>
+                </div>
+            </div>
+
+            <!-- With RAG and Citations -->
+            <div class="bg-white rounded-lg shadow-xl p-6 fade-in border-2 border-purple-400">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-purple-600">🎯 С ЦИТАТАМИ</h2>
+                    <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">День 18</span>
+                </div>
+
+                <div class="mb-3 bg-purple-50 border border-purple-200 px-3 py-2 rounded-lg text-xs text-purple-700">
+                    ✓ Все утверждения цитируются
+                </div>
+
+                <div class="prose max-w-none text-gray-700 mb-4 text-sm" id="rag-citations-answer"></div>
+
+                <div class="border-t pt-4 mt-4">
+                    <h3 class="font-semibold text-gray-700 mb-2">📌 Цитированные источники:</h3>
+                    <div class="text-sm text-gray-600" id="rag-citations-sources"></div>
+                </div>
+
+                <div class="mt-3 text-sm text-gray-500">
+                    <span id="rag-citations-count">0 цитат</span> • <span id="rag-citations-chunks">0 источников</span>
+                </div>
+            </div>
+
+            <!-- Without RAG -->
+            <div class="bg-white rounded-lg shadow-xl p-6 fade-in">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-2xl font-bold text-orange-600">❌ Без RAG</h2>
+                    <span class="text-sm text-gray-500" id="no-rag-length"></span>
+                </div>
+
+                <div class="mb-3 bg-orange-50 border border-orange-200 px-3 py-2 rounded-lg text-xs text-orange-700">
+                    ⚠️ Риск галлюцинаций
+                </div>
+
+                <div class="prose max-w-none text-gray-700 mb-4 text-sm" id="no-rag-answer"></div>
+
+                <div class="border-t pt-4 mt-4">
+                    <p class="text-sm text-gray-500 italic">
+                        Ответ основан только на общих знаниях модели, без документов
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detailed Analysis -->
+        <div class="bg-white rounded-lg shadow-xl p-6 fade-in">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🔬 Детальный анализ</h2>
+            <div class="space-y-4" id="detailed-analysis"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Check system status on load
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const response = await fetch('/rag/status');
+            const data = await response.json();
+
+            const indicator = document.getElementById('status-indicator');
+            if (data.ready && data.ollamaEmbedding && data.ollamaLLM) {
+                indicator.innerHTML = `
+                        <div class="w-3 h-3 rounded-full bg-green-500 mr-2 animate-pulse"></div>
+                        <span class="text-sm text-green-600 font-semibold">✓ Система готова</span>
+                    `;
+            } else {
+                indicator.innerHTML = `
+                        <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+                        <span class="text-sm text-red-600">✗ Система не готова</span>
+                    `;
+            }
+
+            document.getElementById('stats').textContent =
+                `📊 ${data.totalChunks} чанков • ${data.sources} источников`;
+        } catch (error) {
+            console.error('Error checking status:', error);
+        }
+    });
+
+    function setQuestion(question) {
+        document.getElementById('question-input').value = question;
+    }
+
+    async function compareRAG() {
+        const question = document.getElementById('question-input').value.trim();
+
+        if (!question) {
+            alert('Пожалуйста, введите вопрос');
+            return;
+        }
+
+        // Show loading, hide results
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('results').classList.add('hidden');
+        document.getElementById('compare-btn').disabled = true;
+        document.getElementById('compare-btn').textContent = '⏳ Обработка...';
+
+        try {
+            // Fetch compare results (RAG vs no-RAG)
+            const compareResponse = await fetch('/rag/compare', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    question: question,
+                    topK: 3
+                })
+            });
+
+            if (!compareResponse.ok) {
+                throw new Error(`HTTP error! status: ${compareResponse.status}`);
+            }
+
+            const compareData = await compareResponse.json();
+
+            // Fetch citations results
+            const citationsResponse = await fetch('/rag/query-with-citations', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    question: question,
+                    topK: 3
+                })
+            });
+
+            let citationsData = null;
+            if (citationsResponse.ok) {
+                citationsData = await citationsResponse.json();
+            }
+
+            displayResults(compareData, citationsData);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Ошибка при обработке запроса: ' + error.message);
+        } finally {
+            document.getElementById('loading').classList.add('hidden');
+            document.getElementById('compare-btn').disabled = false;
+            document.getElementById('compare-btn').textContent = '🚀 Сравнить';
+        }
+    }
+
+    // Store current question for alternative chunks
+    let currentQuestion = '';
+
+    function displayResults(data, citationsData) {
+        currentQuestion = data.question || document.getElementById('question-input').value;
+
+        // Analysis Summary
+        const analysisSummary = document.getElementById('analysis-summary');
+        const isHelpful = data.analysis?.ragHelpful ?? true;
+
+        analysisSummary.innerHTML = `
+                <div class="flex items-start space-x-4">
+                    <div class="text-6xl">${isHelpful ? '✅' : '⚠️'}</div>
+                    <div class="flex-1">
+                        <h2 class="text-2xl font-bold mb-2">
+                            ${isHelpful ? 'RAG был полезен!' : 'RAG частично помог'}
+                        </h2>
+                        <p class="text-gray-700 text-lg">${data.analysis?.reason ?? 'Результаты получены'}</p>
+                        <p class="text-gray-600 mt-2">${data.analysis?.specificityComparison ?? ''}</p>
+                        ${citationsData ? '<p class="text-purple-600 mt-2">🎯 Система цитирования (День 18): ' + (citationsData.retrievedChunks?.filter(c => c.isCited).length || 0) + ' источников цитировано</p>' : ''}
+                    </div>
+                </div>
+            `;
+
+        // Display quality score badge
+        const qualityScore = data.withRAG?.qualityScore ?? 0;
+        const qualityBadge = document.getElementById('quality-badge');
+
+        if (qualityScore !== null && qualityScore !== undefined) {
+            const qualityPercent = (qualityScore * 100).toFixed(0);
+            let badgeColor = 'bg-red-100 text-red-700';
+            let badgeIcon = '❌';
+
+            if (qualityScore >= 0.7) {
+                badgeColor = 'bg-green-100 text-green-700';
+                badgeIcon = '✅';
+            } else if (qualityScore >= 0.5) {
+                badgeColor = 'bg-yellow-100 text-yellow-700';
+                badgeIcon = '⚠️';
+            }
+
+            qualityBadge.innerHTML = `
+                <div class="${badgeColor} px-4 py-2 rounded-lg text-sm font-semibold">
+                    ${badgeIcon} Качество результатов: ${qualityPercent}%
+                </div>
+            `;
+        }
+
+        // Display suggestion if available
+        const suggestion = data.withRAG?.suggestion;
+        const suggestionBox = document.getElementById('suggestion-box');
+
+        if (suggestion) {
+            suggestionBox.classList.remove('hidden');
+            suggestionBox.innerHTML = `
+                <div class="bg-blue-50 border border-blue-200 px-4 py-3 rounded-lg text-sm text-blue-800">
+                    💡 ${suggestion}
+                </div>
+            `;
+        }
+
+        // Always show alternatives button after each query
+        const alternativesSection = document.getElementById('alternatives-section');
+        alternativesSection.classList.remove('hidden');
+
+        // With RAG
+        document.getElementById('rag-answer').textContent = data.withRAG?.answer || 'Нет ответа';
+        document.getElementById('rag-length').textContent = `${data.withRAG?.answerLength ?? 0} символов`;
+        document.getElementById('rag-chunks').textContent = `${data.withRAG?.retrievedChunksCount ?? 0} чанков`;
+        document.getElementById('rag-context').textContent = `${data.withRAG?.contextLength ?? 0} символов контекста`;
+
+        const sourcesDiv = document.getElementById('rag-sources');
+        const topSources = data.withRAG?.topSources || [];
+
+        if (topSources.length > 0) {
+            sourcesDiv.innerHTML = topSources
+                .map((source, idx) => `<div class="mb-1">📄 ${idx + 1}. ${source}</div>`)
+                .join('');
+        } else {
+            sourcesDiv.innerHTML = '<div class="text-gray-400">Нет источников (все отфильтрованы)</div>';
+        }
+
+        // Without RAG
+        document.getElementById('no-rag-answer').textContent = data.withoutRAG.answer;
+        document.getElementById('no-rag-length').textContent = `${data.withoutRAG.answerLength} символов`;
+
+        // With RAG and Citations
+        if (citationsData) {
+            document.getElementById('rag-citations-answer').textContent = citationsData.answer || 'Ответ не получен';
+
+            const citedChunks = citationsData.retrievedChunks?.filter(c => c.isCited) || [];
+            const citationCount = (citationsData.answer?.match(/\[Source \d+\]/g) || []).length;
+
+            document.getElementById('rag-citations-count').textContent = `${citationCount} цитат`;
+            document.getElementById('rag-citations-chunks').textContent = `${citedChunks.length} источников`;
+
+            const citationsSourcesDiv = document.getElementById('rag-citations-sources');
+            if (citedChunks.length > 0) {
+                citationsSourcesDiv.innerHTML = citedChunks
+                    .map((chunk, idx) => {
+                        const similarity = (chunk.similarity * 100).toFixed(1);
+                        return `<div class="mb-2"><span class="font-semibold text-sm">${idx + 1}. ${chunk.sourceFile}</span> <span class="text-xs text-gray-500">Релевантность: ${similarity}%</span></div>`;
+                    })
+                    .join('');
+            } else {
+                citationsSourcesDiv.innerHTML = '<div class="text-gray-400 text-sm">Источники не найдены</div>';
+            }
+        } else {
+            document.getElementById('rag-citations-answer').textContent = 'Ошибка получения данных с цитатами';
+        }
+
+        // Detailed Analysis
+        const detailedAnalysis = document.getElementById('detailed-analysis');
+        let factsHTML = '';
+
+        if (data.analysis.factsFromContext && data.analysis.factsFromContext.length > 0) {
+            factsHTML = `
+                    <div>
+                        <h3 class="font-semibold text-gray-700 mb-2">📋 Ключевые факты из контекста:</h3>
+                        <ul class="list-disc list-inside space-y-1 text-gray-600">
+                            ${data.analysis.factsFromContext.slice(0, 5).map(fact =>
+                `<li class="text-sm">${fact.substring(0, 150)}${fact.length > 150 ? '...' : ''}</li>`
+            ).join('')}
+                        </ul>
+                    </div>
+                `;
+        }
+
+        detailedAnalysis.innerHTML = `
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="bg-green-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-green-700 mb-2">С RAG</h3>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>✓ Длина: ${data.withRAG.answerLength} символов</li>
+                            <li>✓ Чанков: ${data.withRAG.retrievedChunksCount}</li>
+                            <li>✓ Контекст: ${(data.withRAG.contextLength / 1024).toFixed(1)} KB</li>
+                        </ul>
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-lg">
+                        <h3 class="font-semibold text-orange-700 mb-2">Без RAG</h3>
+                        <ul class="text-sm text-gray-700 space-y-1">
+                            <li>✓ Длина: ${data.withoutRAG.answerLength} символов</li>
+                            <li>✓ Только общие знания модели</li>
+                            <li>✓ Без использования документов</li>
+                        </ul>
+                    </div>
+                </div>
+                ${factsHTML}
+            `;
+
+        // Show results
+        document.getElementById('results').classList.remove('hidden');
+
+        // Scroll to results
+        document.getElementById('results').scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+
+    async function loadAlternativeChunks() {
+        if (!currentQuestion) {
+            alert('Нет сохраненного вопроса');
+            return;
+        }
+
+        const alternativesSection = document.getElementById('alternatives-section');
+        const button = alternativesSection.querySelector('button');
+        button.disabled = true;
+        button.textContent = '⏳ Загрузка...';
+
+        try {
+            const response = await fetch('/rag/query-alternatives', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    question: currentQuestion,
+                    offset: 0,
+                    limit: 3
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            displayAlternativeResults(data);
+        } catch (error) {
+            console.error('Error:', error);
+            alert('Ошибка при загрузке альтернативных результатов: ' + error.message);
+        } finally {
+            button.disabled = false;
+            button.textContent = '🔄 Показать альтернативные результаты';
+        }
+    }
+
+    function displayAlternativeResults(data) {
+        const sourcesDiv = document.getElementById('rag-sources');
+
+        if (!data.retrievedChunks || data.retrievedChunks.length === 0) {
+            sourcesDiv.innerHTML = `
+                <div class="bg-yellow-50 border border-yellow-200 px-4 py-3 rounded-lg text-sm text-yellow-800 mb-3">
+                    ${data.suggestion || 'Нет доступных альтернативных результатов'}
+                </div>
+            `;
+            return;
+        }
+
+        // Update answer
+        document.getElementById('rag-answer').textContent = data.answer || 'Ответ сгенерирован на основе альтернативных чанков';
+
+        // Update sources with alternative chunks
+        let sourcesHTML = `
+            <div class="bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg text-xs text-blue-700 mb-3">
+                🔄 Показаны альтернативные результаты (отфильтрованные ранее)
+            </div>
+        `;
+
+        sourcesHTML += data.retrievedChunks.map((chunk, idx) => {
+            const similarity = (chunk.similarity * 100).toFixed(1);
+            return `
+                <div class="mb-3 p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-sm">📄 ${idx + 1}. ${chunk.sourceFile}</span>
+                        <span class="text-xs text-gray-500">Similarity: ${similarity}%</span>
+                    </div>
+                    ${chunk.headingContext ? `<div class="text-xs text-blue-600 mb-1">📍 ${chunk.headingContext}</div>` : ''}
+                    <div class="text-sm text-gray-700">${chunk.text.substring(0, 200)}${chunk.text.length > 200 ? '...' : ''}</div>
+                </div>
+            `;
+        }).join('');
+
+        if (data.alternativeChunksAvailable) {
+            sourcesHTML += `
+                <div class="text-sm text-gray-600 mt-3">
+                    💡 ${data.suggestion}
+                </div>
+            `;
+        }
+
+        sourcesDiv.innerHTML = sourcesHTML;
+    }
+</script>
+</body>
+</html>

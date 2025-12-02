@@ -1,6 +1,7 @@
 package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.DemoMcpIntegration.*
+import com.markettwits.aichallenge.rag.*
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
@@ -12,11 +13,37 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import org.jetbrains.exposed.sql.Database
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.time.format.DateTimeFormatter
+
+// RAG Query Request models
+@Serializable
+data class RAGQueryRequest(val question: String, val topK: Int = 5)
+
+@Serializable
+data class RAGCompareRequest(val question: String, val topK: Int = 5)
+
+@Serializable
+data class RAGChatRequest(
+    val sessionId: String,
+    val message: String,
+    val topK: Int = 5,
+)
+
+@Serializable
+data class RAGChatResponse(
+    val sessionId: String,
+    val question: String,
+    val answer: String,
+    val sources: List<RetrievedChunkInfo>,
+    val messageCount: Int,
+    val timestamp: Long = System.currentTimeMillis(),
+)
 
 fun Application.configureRouting(
     sessionManager: SessionManager,
@@ -47,6 +74,26 @@ fun Application.configureRouting(
     }
 
     val huggingFaceClient = HuggingFaceClient(huggingFaceKey)
+
+    // Initialize RAG system (Day 15)
+    val database = Database.connect("jdbc:sqlite:data/documents.db", driver = "org.sqlite.JDBC")
+    val embeddingClient = OllamaEmbeddingClient()
+    val ragRetriever = RAGRetriever(database, embeddingClient)
+
+    // Initialize RAG Query system (Day 16)
+    val llmClient = OllamaLLMClient(model = "llama3.2")
+    val vectorStore = VectorStore()
+    val ragQueryService = RAGQueryService(database, embeddingClient, llmClient, vectorStore)
+    val ragComparisonService = RAGComparisonService(ragQueryService)
+
+    // Initialize Chat History Service (Day 19)
+    val chatHistoryService = ChatHistoryService(
+        maxMessagesPerSession = 20,
+        sessionTimeoutMinutes = 60
+    )
+
+    // Flag to track if knowledge base is built
+    var isKnowledgeBaseBuilt = false
 
     routing {
         post("/chat") {
@@ -969,6 +1016,439 @@ fun Application.configureRouting(
                 call.respondFile(file)
             } else {
                 call.respondText("File not found", status = HttpStatusCode.NotFound)
+            }
+        }
+
+        // RAG System Endpoints (Day 15)
+        post("/rag/build-knowledge-base") {
+            try {
+                logger.info("Starting knowledge base build...")
+                call.respond(HttpStatusCode.Accepted, mapOf("status" to "Building knowledge base in progress..."))
+
+                // Build knowledge base asynchronously
+                ragRetriever.buildKnowledgeBase("data/farming")
+                isKnowledgeBaseBuilt = true
+
+                logger.info("Knowledge base built successfully")
+                call.respond(
+                    mapOf(
+                        "status" to "success",
+                        "message" to "Knowledge base built successfully",
+                        "stats" to ragRetriever.getStats()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error building knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message, "status" to "error")
+                )
+            }
+        }
+
+        post("/rag/search") {
+            try {
+                data class RAGSearchRequest(val query: String, val topK: Int = 5)
+
+                val request = call.receive<RAGSearchRequest>()
+
+                logger.info("RAG search for query: ${request.query.take(100)}")
+
+                if (!isKnowledgeBaseBuilt) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Knowledge base not built yet. Call /rag/build-knowledge-base first")
+                    )
+                }
+
+                val results = ragRetriever.retrieveRelevant(request.query, request.topK)
+
+                val formattedResults = results.map { chunk ->
+                    mapOf(
+                        "text" to chunk.text,
+                        "sourceFile" to chunk.sourceFile,
+                        "chunkIndex" to chunk.chunkIndex,
+                        "similarity" to chunk.similarity
+                    )
+                }
+
+                call.respond(
+                    mapOf(
+                        "query" to request.query,
+                        "results" to formattedResults,
+                        "count" to formattedResults.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error searching knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/stats") {
+            try {
+                val stats = ragRetriever.getStats()
+                call.respond(
+                    mapOf(
+                        "stats" to stats,
+                        "isBuilt" to isKnowledgeBaseBuilt
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG stats", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/reload") {
+            try {
+                logger.info("Reloading knowledge base...")
+                ragRetriever.reloadKnowledgeBase("data/farming")
+                isKnowledgeBaseBuilt = true
+
+                call.respond(
+                    mapOf(
+                        "status" to "success",
+                        "message" to "Knowledge base reloaded successfully",
+                        "stats" to ragRetriever.getStats()
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error reloading knowledge base", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        // RAG Progress Tracking Endpoints (Day 15 - Progress)
+        get("/rag/progress") {
+            try {
+                val progress = RAGProgressTracker.getProgress()
+                call.respond(progress)
+            } catch (e: Exception) {
+                logger.error("Error getting RAG progress", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/progress/logs") {
+            try {
+                val logs = RAGProgressTracker.getDetailedLogs()
+                call.respond(
+                    mapOf(
+                        "logs" to logs,
+                        "count" to logs.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG logs", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/progress/console") {
+            try {
+                val progress = RAGProgressTracker.getProgress()
+                call.respondText(progress.toConsoleOutput(), contentType = ContentType.Text.Plain)
+            } catch (e: Exception) {
+                logger.error("Error getting RAG console output", e)
+                call.respondText("Error: ${e.message}", status = HttpStatusCode.InternalServerError)
+            }
+        }
+
+        // RAG Query Endpoints (Day 16)
+        post("/rag/query") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("RAG query: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragQueryService.queryWithRAG(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG query", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/query-without-rag") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("Query without RAG: ${request.question}")
+
+                if (!llmClient.isAvailable()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to "Ollama LLM service is not available")
+                    )
+                }
+
+                val result = ragQueryService.queryWithoutRAG(request.question)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing query without RAG", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/compare") {
+            try {
+                val request = call.receive<RAGCompareRequest>()
+
+                logger.info("RAG comparison for: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragComparisonService.compare(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG comparison", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/query-alternatives") {
+            try {
+                @Serializable
+                data class AlternativesRequest(
+                    val question: String,
+                    val offset: Int = 0,
+                    val limit: Int = 3,
+                )
+
+                val request = call.receive<AlternativesRequest>()
+                logger.info("Getting alternative chunks for: ${request.question}")
+
+                val result = ragQueryService.getAlternativeChunks(
+                    question = request.question,
+                    offset = request.offset,
+                    limit = request.limit
+                )
+
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error getting alternative chunks", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/rag/query-with-citations") {
+            try {
+                val request = call.receive<RAGQueryRequest>()
+
+                logger.info("RAG query WITH citations: ${request.question}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                val result = ragQueryService.queryWithRAGAndCitations(request.question, request.topK)
+                call.respond(HttpStatusCode.OK, result)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG query with citations", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/rag/status") {
+            try {
+                val isReady = ragQueryService.isReady()
+                val stats = ragQueryService.getStats()
+                val totalChunks = stats["totalChunks"] ?: 0
+                val sources = stats["sources"] ?: 0
+
+                call.respondText(
+                    contentType = ContentType.Application.Json,
+                    text = """{"ready":$isReady,"totalChunks":$totalChunks,"sources":$sources,"ollamaEmbedding":${embeddingClient.isAvailable()},"ollamaLLM":${llmClient.isAvailable()}}"""
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting RAG status", e)
+                call.respondText(
+                    contentType = ContentType.Application.Json,
+                    status = HttpStatusCode.InternalServerError,
+                    text = """{"error":"${e.message}"}"""
+                )
+            }
+        }
+
+        // RAG Chat Endpoints (Day 19)
+        post("/chat/rag") {
+            try {
+                val request = call.receive<RAGChatRequest>()
+
+                logger.info("RAG chat request from session ${request.sessionId}: ${request.message}")
+
+                // Check if system is ready
+                if (!ragQueryService.isReady()) {
+                    return@post call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf(
+                            "error" to "RAG system is not ready. Make sure the knowledge base is built and Ollama is running."
+                        )
+                    )
+                }
+
+                // Add user message to history
+                chatHistoryService.addUserMessage(request.sessionId, request.message)
+
+                // Get chat history context
+                val historyContext = chatHistoryService.getHistoryContext(request.sessionId, lastN = 5)
+
+                // Query RAG with history
+                val result = ragQueryService.queryWithRAGAndHistory(
+                    question = request.message,
+                    chatHistory = historyContext,
+                    topK = request.topK
+                )
+
+                // Add assistant response to history
+                chatHistoryService.addAssistantMessage(
+                    sessionId = request.sessionId,
+                    message = result.answer,
+                    sources = result.retrievedChunks
+                )
+
+                // Get current message count
+                val history = chatHistoryService.getHistory(request.sessionId)
+
+                val response = RAGChatResponse(
+                    sessionId = request.sessionId,
+                    question = request.message,
+                    answer = result.answer,
+                    sources = result.retrievedChunks,
+                    messageCount = history.size
+                )
+
+                call.respond(HttpStatusCode.OK, response)
+            } catch (e: Exception) {
+                logger.error("Error processing RAG chat request", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/rag/history/{sessionId}") {
+            try {
+                val sessionId = call.parameters["sessionId"] ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Session ID is required")
+                )
+
+                val history = chatHistoryService.getHistory(sessionId)
+                val stats = chatHistoryService.getSessionStats(sessionId)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "sessionId" to sessionId,
+                        "history" to history,
+                        "stats" to (stats ?: mapOf<String, Any>())
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting chat history", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        post("/chat/rag/clear") {
+            try {
+                val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+
+                chatHistoryService.clearSession(sessionId)
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "status" to "cleared",
+                        "sessionId" to sessionId
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error clearing RAG chat session", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
+            }
+        }
+
+        get("/chat/rag/sessions") {
+            try {
+                val sessions = chatHistoryService.getActiveSessions()
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "sessions" to sessions,
+                        "count" to sessions.size
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error getting active sessions", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to e.message)
+                )
             }
         }
     }
