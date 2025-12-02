@@ -1,0 +1,164 @@
+name: Automated Code Review
+
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  code-review:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for diff analysis
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x ./gradlew
+
+      - name: Build and start server
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        run: |
+          echo "Building application..."
+          ./gradlew build -x test
+
+          echo "Starting server in background..."
+          ./gradlew run > /tmp/app.log 2>&1 &
+          SERVER_PID=$!
+          echo "Server PID: $SERVER_PID"
+
+          # Wait for server to be ready (max 2 minutes)
+          echo "Waiting for server to start..."
+          for i in {1..60}; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              echo "Server is ready!"
+              break
+            fi
+            if [ $i -eq 60 ]; then
+              echo "Server failed to start within 2 minutes"
+              echo "=== Server logs ==="
+              cat /tmp/app.log
+              exit 1
+            fi
+            echo "Waiting... ($i/60)"
+            sleep 2
+          done
+
+      - name: Trigger Code Review
+        id: review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BASE_BRANCH: ${{ github.event.pull_request.base.ref }}
+          HEAD_BRANCH: ${{ github.event.pull_request.head.ref }}
+        run: |
+          echo "Triggering code review for PR #${PR_NUMBER}"
+          echo "Base branch: ${BASE_BRANCH}"
+          echo "Head branch: ${HEAD_BRANCH}"
+
+          # Checkout base and head branches
+          git fetch origin ${BASE_BRANCH}:${BASE_BRANCH}
+          git fetch origin ${HEAD_BRANCH}:${HEAD_BRANCH}
+
+          # Start code review
+          RESPONSE=$(curl -s -X POST http://localhost:8080/code-review/analyze \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"baseBranch\": \"${BASE_BRANCH}\",
+              \"headBranch\": \"${HEAD_BRANCH}\",
+              \"analysisTypes\": [\"general\", \"security\", \"best_practices\"],
+              \"includeFileContent\": false
+            }")
+
+          echo "Response: $RESPONSE"
+
+          REVIEW_ID=$(echo $RESPONSE | jq -r '.reviewId')
+          echo "Review ID: $REVIEW_ID"
+          echo "review_id=$REVIEW_ID" >> $GITHUB_OUTPUT
+
+          # Wait for review to complete (max 5 minutes)
+          echo "Waiting for review to complete..."
+          for i in {1..60}; do
+            STATUS_RESPONSE=$(curl -s http://localhost:8080/code-review/status/${REVIEW_ID})
+            STATUS=$(echo $STATUS_RESPONSE | jq -r '.status')
+            echo "Status check $i/60: $STATUS"
+
+            if [ "$STATUS" = "COMPLETED" ]; then
+              echo "Review completed!"
+              break
+            elif [ "$STATUS" = "FAILED" ]; then
+              echo "Review failed!"
+              ERROR=$(echo $STATUS_RESPONSE | jq -r '.error')
+              echo "Error: $ERROR"
+              exit 1
+            fi
+
+            if [ $i -eq 60 ]; then
+              echo "Review timed out after 5 minutes"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+      - name: Post Review Comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REVIEW_ID: ${{ steps.review.outputs.review_id }}
+        run: |
+          echo "Fetching review result..."
+          MARKDOWN=$(curl -s http://localhost:8080/code-review/result/${REVIEW_ID}/markdown)
+
+          echo "Posting comment to PR #${PR_NUMBER}..."
+
+          # Create comment body file
+          cat > /tmp/comment.md << 'EOF'
+  $MARKDOWN
+  EOF
+  
+  # Post comment using GitHub CLI
+  gh pr comment ${PR_NUMBER} --body-file /tmp/comment.md
+  
+  echo "Comment posted successfully!"
+
+- name: Check Review Results
+  if: always()
+  env:
+    REVIEW_ID: ${{ steps.review.outputs.review_id }}
+  run: |
+    echo "=== Review Summary ==="
+    RESULT=$(curl -s http://localhost:8080/code-review/result/${REVIEW_ID})
+    echo $RESULT | jq '.summary'
+    
+    CRITICAL_COUNT=$(echo $RESULT | jq '.summary.bySeverity.CRITICAL // 0')
+    HIGH_COUNT=$(echo $RESULT | jq '.summary.bySeverity.HIGH // 0')
+    
+    if [ "$CRITICAL_COUNT" -gt 0 ] || [ "$HIGH_COUNT" -gt 0 ]; then
+      echo "⚠️  Found $CRITICAL_COUNT critical and $HIGH_COUNT high severity issues"
+      echo "Please review and address these issues before merging"
+    else
+      echo "✅ No critical or high severity issues found"
+    fi
+
+- name: Server Logs (if failed)
+  if: failure()
+  run: |
+    echo "=== Server Logs ==="
+    cat /tmp/app.log || echo "No logs available"
