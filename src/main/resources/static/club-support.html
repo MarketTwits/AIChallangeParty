@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>SportSauce Club - Поддержка</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        .typing-indicator {
+            display: inline-block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #3B82F6;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .scroll-smooth {
+            scroll-behavior: smooth;
+        }
+
+        /* Custom scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1F2937;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4B5563;
+            border-radius: 4px;
+        }
+
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6B7280;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-900 via-blue-900 to-gray-900 min-h-screen">
+<div class="container mx-auto max-w-4xl h-screen flex flex-col p-4">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-t-xl shadow-2xl p-6">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="bg-white rounded-full p-3">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold text-white">SportSauce Club</h1>
+                    <p class="text-blue-100 text-sm">Служба поддержки</p>
+                </div>
+            </div>
+            <div class="flex space-x-2">
+                <button class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition"
+                        onclick="checkStatus()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2"/>
+                    </svg>
+                </button>
+                <button class="bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-lg transition"
+                        onclick="clearChat()">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chat messages container -->
+    <div class="flex-1 bg-gray-800 overflow-y-auto p-6 space-y-4 custom-scrollbar" id="chat-container">
+        <!-- Welcome message -->
+        <div class="message flex items-start space-x-3">
+            <div class="flex-shrink-0">
+                <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center">
+                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" stroke-linecap="round" stroke-linejoin="round"
+                              stroke-width="2"/>
+                    </svg>
+                </div>
+            </div>
+            <div class="flex-1">
+                <div class="bg-gray-700 rounded-2xl rounded-tl-none p-4 shadow-lg">
+                    <p class="text-white mb-2">👋 Привет! Я помощник SportSauce Club.</p>
+                    <p class="text-gray-300 text-sm">Я могу помочь вам с:</p>
+                    <ul class="text-gray-300 text-sm mt-2 space-y-1 list-disc list-inside">
+                        <li>Информацией о тренировках и расписании</li>
+                        <li>Абонементах и ценах</li>
+                        <li>Тренерах и их специализации</li>
+                        <li>Мероприятиях клуба</li>
+                        <li>Ответами на частые вопросы</li>
+                    </ul>
+                    <p class="text-blue-400 text-sm mt-3">Задавайте любые вопросы о клубе!</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Input form -->
+    <div class="bg-gray-800 rounded-b-xl shadow-2xl p-4">
+        <form class="flex space-x-3" id="chat-form">
+            <input
+                    autocomplete="off"
+                    class="flex-1 bg-gray-700 text-white placeholder-gray-400 rounded-xl px-5 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    id="message-input"
+                    placeholder="Напишите ваш вопрос..."
+                    type="text"
+            />
+            <button
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl transition flex items-center space-x-2 font-medium shadow-lg"
+                    id="send-button"
+                    type="submit"
+            >
+                <span>Отправить</span>
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-linecap="round" stroke-linejoin="round"
+                          stroke-width="2"/>
+                </svg>
+            </button>
+        </form>
+        <div class="mt-2 text-xs text-gray-500 flex items-center justify-between" id="status-bar">
+            <span id="status-text">Готов к общению</span>
+            <span class="font-mono" id="session-id"></span>
+        </div>
+    </div>
+</div>
+
+<script>
+    let sessionId = null;
+    const chatContainer = document.getElementById('chat-container');
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const statusText = document.getElementById('status-text');
+    const sessionIdDisplay = document.getElementById('session-id');
+
+    // Initialize
+    window.addEventListener('load', () => {
+        messageInput.focus();
+        checkStatus();
+    });
+
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = messageInput.value.trim();
+
+        if (!message) return;
+
+        // Clear input
+        messageInput.value = '';
+
+        // Add user message to chat
+        addMessage(message, 'user');
+
+        // Show typing indicator
+        const typingId = addTypingIndicator();
+
+        // Disable input while processing
+        setLoading(true);
+
+        try {
+            const response = await fetch('/club/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    message: message,
+                    sessionId: sessionId,
+                }),
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                // Update session ID
+                if (data.sessionId) {
+                    sessionId = data.sessionId;
+                    sessionIdDisplay.textContent = `Session: ${sessionId.substring(0, 8)}...`;
+                }
+
+                // Remove typing indicator
+                removeTypingIndicator(typingId);
+
+                // Add assistant response
+                addMessage(data.response, 'assistant', data.metadata);
+            } else {
+                removeTypingIndicator(typingId);
+                addMessage(`Ошибка: ${data.error || 'Неизвестная ошибка'}`, 'error');
+            }
+        } catch (error) {
+            removeTypingIndicator(typingId);
+            addMessage(`Ошибка соединения: ${error.message}`, 'error');
+        } finally {
+            setLoading(false);
+            messageInput.focus();
+        }
+    });
+
+    function addMessage(text, role, metadata = null) {
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message flex items-start space-x-3';
+
+        if (role === 'user') {
+            messageDiv.classList.add('flex-row-reverse', 'space-x-reverse');
+        }
+
+        const avatar = document.createElement('div');
+        avatar.className = 'flex-shrink-0';
+
+        const avatarCircle = document.createElement('div');
+        avatarCircle.className = `w-10 h-10 rounded-full flex items-center justify-center ${
+            role === 'user' ? 'bg-green-600' : role === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`;
+
+        const icon = document.createElement('svg');
+        icon.className = 'w-6 h-6 text-white';
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('viewBox', '0 0 24 24');
+
+        if (role === 'user') {
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>';
+        } else if (role === 'error') {
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>';
+        } else {
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m0-3h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>';
+        }
+
+        avatarCircle.appendChild(icon);
+        avatar.appendChild(avatarCircle);
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'flex-1';
+
+        const content = document.createElement('div');
+        content.className = `rounded-2xl p-4 shadow-lg ${
+            role === 'user'
+                ? 'bg-green-600 text-white rounded-tr-none'
+                : role === 'error'
+                    ? 'bg-red-600/90 text-white rounded-tl-none'
+                    : 'bg-gray-700 text-white rounded-tl-none'
+        }`;
+
+        // Format text with line breaks and structure
+        const formattedText = text.replace(/\n/g, '<br>');
+        content.innerHTML = formattedText;
+
+        contentWrapper.appendChild(content);
+
+        // Add metadata if available
+        if (metadata && role === 'assistant') {
+            const metadataDiv = document.createElement('div');
+            metadataDiv.className = 'text-xs text-gray-500 mt-2';
+            const toolsUsed = metadata.toolsUsed ? JSON.parse(metadata.toolsUsed) : [];
+            if (toolsUsed.length > 0) {
+                metadataDiv.textContent = `🔧 Использованы инструменты: ${toolsUsed.join(', ')}`;
+                contentWrapper.appendChild(metadataDiv);
+            }
+        }
+
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentWrapper);
+
+        chatContainer.appendChild(messageDiv);
+        scrollToBottom();
+    }
+
+    function addTypingIndicator() {
+        const id = 'typing-' + Date.now();
+        const messageDiv = document.createElement('div');
+        messageDiv.id = id;
+        messageDiv.className = 'message flex items-start space-x-3';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'flex-shrink-0';
+
+        const avatarCircle = document.createElement('div');
+        avatarCircle.className = 'w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center';
+
+        const icon = document.createElement('svg');
+        icon.className = 'w-6 h-6 text-white';
+        icon.setAttribute('fill', 'none');
+        icon.setAttribute('stroke', 'currentColor');
+        icon.setAttribute('viewBox', '0 0 24 24');
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>';
+
+        avatarCircle.appendChild(icon);
+        avatar.appendChild(avatarCircle);
+
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'flex-1';
+
+        const content = document.createElement('div');
+        content.className = 'bg-gray-700 rounded-2xl rounded-tl-none p-4 shadow-lg';
+
+        const typing = document.createElement('div');
+        typing.className = 'typing-indicator';
+        typing.innerHTML = '<span></span><span></span><span></span>';
+
+        content.appendChild(typing);
+        contentWrapper.appendChild(content);
+
+        messageDiv.appendChild(avatar);
+        messageDiv.appendChild(contentWrapper);
+
+        chatContainer.appendChild(messageDiv);
+        scrollToBottom();
+
+        return id;
+    }
+
+    function removeTypingIndicator(id) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.remove();
+        }
+    }
+
+    function scrollToBottom() {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+
+    function setLoading(loading) {
+        messageInput.disabled = loading;
+        sendButton.disabled = loading;
+        statusText.textContent = loading ? 'Обработка...' : 'Готов к общению';
+    }
+
+    async function checkStatus() {
+        try {
+            const response = await fetch('/club/status');
+            const data = await response.json();
+
+            statusText.textContent = `✅ Система готова (${data.toolsAvailable} инструментов, RAG: ${data.ragReady ? 'готов' : 'не готов'})`;
+
+            setTimeout(() => {
+                if (statusText.textContent.includes('Система готова')) {
+                    statusText.textContent = 'Готов к общению';
+                }
+            }, 3000);
+        } catch (error) {
+            statusText.textContent = `❌ Ошибка соединения`;
+        }
+    }
+
+    function clearChat() {
+        if (!confirm('Очистить историю чата?')) return;
+
+        if (sessionId) {
+            fetch(`/club/clear?sessionId=${sessionId}`, {method: 'POST'})
+                .then(() => {
+                    sessionId = null;
+                    sessionIdDisplay.textContent = '';
+                    chatContainer.innerHTML = '';
+                    addMessage('Чат очищен. Начните новый диалог!', 'assistant');
+                });
+        } else {
+            chatContainer.innerHTML = '';
+            addMessage('Чат очищен. Начните новый диалог!', 'assistant');
+        }
+    }
+</script>
+</body>
+</html>

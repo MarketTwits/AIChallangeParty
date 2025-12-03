@@ -50,6 +50,14 @@ application {
     mainClass.set("com.markettwits.aichallenge.ApplicationKt")
 }
 
+// Task to run club data indexing
+tasks.register<JavaExec>("runIndexClubData") {
+    group = "application"
+    description = "Index club documentation into RAG system"
+    mainClass.set("com.markettwits.aichallenge.IndexClubDataKt")
+    classpath = sourceSets["main"].runtimeClasspath
+}
+
 tasks.test {
     useJUnitPlatform()
 }

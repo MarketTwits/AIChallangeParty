@@ -771,26 +771,26 @@ function initReasoningTab() {
     const tabTraining = document.getElementById('tab-training');
     const tabReasoning = document.getElementById('tab-reasoning');
     const tabModels = document.getElementById('tab-models');
-    const tabRag = document.getElementById('tab-rag');
+    const tabClub = document.getElementById('tab-club');
     const trainingContent = document.getElementById('training-content');
     const reasoningContent = document.getElementById('reasoning-content');
     const modelsContent = document.getElementById('models-content');
-    const ragContent = document.getElementById('rag-content');
+    const clubContent = document.getElementById('club-content');
 
     console.log('Elements:', {
         tabTraining: !!tabTraining,
         tabReasoning: !!tabReasoning,
         tabModels: !!tabModels,
-        tabRag: !!tabRag,
+        tabClub: !!tabClub,
         trainingContent: !!trainingContent,
         reasoningContent: !!reasoningContent,
         modelsContent: !!modelsContent,
-        ragContent: !!ragContent
+        clubContent: !!clubContent
     });
 
-    if (!tabTraining || !tabReasoning || !tabModels || !tabRag || !trainingContent || !reasoningContent || !modelsContent || !ragContent) {
+    if (!tabTraining || !tabReasoning || !tabModels || !tabClub || !trainingContent || !reasoningContent || !modelsContent || !clubContent) {
         console.error('Tab elements not found!', {
-            tabTraining, tabReasoning, tabModels, tabRag, trainingContent, reasoningContent, modelsContent, ragContent
+            tabTraining, tabReasoning, tabModels, tabClub, trainingContent, reasoningContent, modelsContent, clubContent
         });
         return;
     }
@@ -801,11 +801,11 @@ function initReasoningTab() {
         tabTraining.classList.remove('active-tab');
         tabReasoning.classList.remove('active-tab');
         tabModels.classList.remove('active-tab');
-        tabRag.classList.remove('active-tab');
+        tabClub.classList.remove('active-tab');
         trainingContent.classList.remove('active');
         reasoningContent.classList.remove('active');
         modelsContent.classList.remove('active');
-        ragContent.classList.remove('active');
+        clubContent.classList.remove('active');
 
         if (tab === 'training') {
             tabTraining.classList.add('active-tab');
@@ -816,12 +816,12 @@ function initReasoningTab() {
         } else if (tab === 'models') {
             tabModels.classList.add('active-tab');
             modelsContent.classList.add('active');
-        } else if (tab === 'rag') {
-            tabRag.classList.add('active-tab');
-            ragContent.classList.add('active');
-            // Initialize RAG chat on first load
-            if (typeof initRagChat === 'function') {
-                initRagChat();
+        } else if (tab === 'club') {
+            tabClub.classList.add('active-tab');
+            clubContent.classList.add('active');
+            // Initialize Club chat on first load
+            if (typeof initClubChat === 'function') {
+                initClubChat();
             }
         }
         console.log('Tab switched successfully');
@@ -839,9 +839,9 @@ function initReasoningTab() {
         console.log('Models tab clicked');
         switchTab('models');
     });
-    tabRag.addEventListener('click', () => {
-        console.log('RAG tab clicked');
-        switchTab('rag');
+    tabClub.addEventListener('click', () => {
+        console.log('Club tab clicked');
+        switchTab('club');
     });
 
     console.log('Event listeners attached successfully');
@@ -2589,59 +2589,37 @@ if (!ragSessionId) {
     localStorage.setItem('ragChatSessionId', ragSessionId);
 }
 
-function initRagChat() {
-    if (ragInitialized) return;
-    ragInitialized = true;
+let clubInitialized = false;
+let clubSessionId = null;
 
-    console.log('Initializing RAG chat...');
+function initClubChat() {
+    if (clubInitialized) return;
+    clubInitialized = true;
 
-    const ragSessionIdEl = document.getElementById('rag-session-id');
-    const ragForm = document.getElementById('rag-form');
-    const ragInput = document.getElementById('rag-input');
-    const ragMessages = document.getElementById('rag-messages');
-    const ragLoading = document.getElementById('rag-loading');
-    const ragClearBtn = document.getElementById('rag-clear-btn');
-    const ragStatusEl = document.getElementById('rag-status');
-    const ragMessageCountEl = document.getElementById('rag-message-count');
-    const ragQuickPrompts = document.querySelectorAll('[data-rag-question]');
+    console.log('Initializing Club chat...');
 
-    if (ragSessionIdEl) {
-        ragSessionIdEl.textContent = ragSessionId;
+    const clubSessionIdEl = document.getElementById('club-session-id');
+    const clubForm = document.getElementById('club-form');
+    const clubInput = document.getElementById('club-input');
+    const clubMessages = document.getElementById('club-messages');
+    const clubLoading = document.getElementById('club-loading');
+    const clubClearBtn = document.getElementById('club-clear-btn');
+    const clubStatusEl = document.getElementById('club-status');
+    const clubMessageCountEl = document.getElementById('club-message-count');
+    const clubQuickPrompts = document.querySelectorAll('[data-club-question]');
+
+    // Initialize session ID if needed
+    if (!clubSessionId) {
+        clubSessionId = 'club-session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
     }
 
-    // Check RAG system status
-    async function checkRagStatus() {
-        try {
-            const response = await fetch('/rag/status');
-            const data = await response.json();
-
-            if (ragStatusEl) {
-                if (data.ready) {
-                    ragStatusEl.innerHTML = `
-                        <span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>
-                        Готов (${data.totalChunks} чанков)
-                    `;
-                } else {
-                    ragStatusEl.innerHTML = `
-                        <span class="inline-block w-2 h-2 bg-red-400 rounded-full mr-1"></span>
-                        Не готов
-                    `;
-                }
-            }
-        } catch (error) {
-            console.error('Error checking RAG status:', error);
-            if (ragStatusEl) {
-                ragStatusEl.innerHTML = `
-                    <span class="inline-block w-2 h-2 bg-red-400 rounded-full mr-1"></span>
-                    Ошибка
-                `;
-            }
-        }
+    if (clubSessionIdEl) {
+        clubSessionIdEl.textContent = clubSessionId.substring(0, 8) + '...';
     }
 
     // Add message to chat
-    function addRagMessage(role, content, sources = []) {
-        if (!ragMessages) return;
+    function addClubMessage(role, content, metadata = null) {
+        if (!clubMessages) return;
 
         const messageDiv = document.createElement('div');
         messageDiv.className = 'flex items-start space-x-4 message';
@@ -2656,108 +2634,69 @@ function initRagChat() {
                 </div>
             `;
         } else {
-            const sourcesHtml = sources.length > 0 ? `
-                <div class="mt-4 pt-4 border-t border-gray-200">
-                    <p class="text-xs font-semibold mb-2" style="color: var(--primary-color);">ИСТОЧНИКИ (${sources.length}):</p>
-                    <div class="space-y-2">
-                        ${sources.map((source, idx) => `
-                            <div class="bg-blue-50 rounded-lg border border-blue-100 overflow-hidden">
-                                <button class="rag-source-toggle w-full text-left p-3 hover:bg-blue-100 transition-colors" data-source-idx="${idx}">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="inline-block px-2 py-1 bg-${source.isCited ? 'green' : 'gray'}-500 text-white rounded text-xs font-mono">
-                                            Источник ${idx + 1}
-                                        </span>
-                                        <span class="text-xs" style="color: var(--primary-color);">${source.sourceFile}</span>
-                                        <span class="text-xs text-blue-600">${(source.similarity * 100).toFixed(1)}%</span>
-                                        ${source.isCited ? '<span class="text-xs text-green-600">✓ Цитировано</span>' : ''}
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-xs text-gray-600 flex-1">${escapeHtml(source.text.substring(0, 100))}${source.text.length > 100 ? '...' : ''}</p>
-                                        <svg class="w-4 h-4 text-gray-500 ml-2 transform transition-transform rag-source-chevron-${idx}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                        </svg>
-                                    </div>
-                                </button>
-                                <div class="rag-source-content px-3 pb-3 hidden" data-source-content="${idx}">
-                                    <div class="bg-white rounded p-3 border border-blue-200">
-                                        <p class="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">${escapeHtml(source.text)}</p>
-                                        ${source.headingContext ? `<p class="text-xs text-blue-600 mt-2 pt-2 border-t border-blue-100">📌 Контекст: ${escapeHtml(source.headingContext)}</p>` : ''}
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            ` : '';
+            let toolsHtml = '';
+            if (metadata && metadata.toolsUsed) {
+                // Handle both array and comma-separated string
+                const tools = Array.isArray(metadata.toolsUsed)
+                    ? metadata.toolsUsed
+                    : (typeof metadata.toolsUsed === 'string' ? metadata.toolsUsed.split(', ').filter(t => t.trim()) : []);
+                if (tools.length > 0) {
+                    toolsHtml = `
+                        <div class="mt-3 pt-3 border-t border-gray-200">
+                            <p class="text-xs text-gray-500">🔧 Использованы инструменты: ${tools.join(', ')}</p>
+                        </div>
+                    `;
+                }
+            }
 
             messageDiv.innerHTML = `
                 <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
-                    AI
+                    🏃
                 </div>
                 <div class="flex-1">
-                    <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
+                    <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">Помощник SportSauce</p>
                     <div class="assistant-message p-4 rounded-2xl rounded-tl-none">
                         <p class="text-gray-700 whitespace-pre-wrap">${escapeHtml(content)}</p>
-                        ${sourcesHtml}
+                        ${toolsHtml}
                     </div>
                 </div>
             `;
         }
 
-        ragMessages.appendChild(messageDiv);
-        ragMessages.scrollTop = ragMessages.scrollHeight;
+        clubMessages.appendChild(messageDiv);
+        clubMessages.scrollTop = clubMessages.scrollHeight;
 
-        // Add click handlers for source toggles
-        if (role === 'assistant' && sources.length > 0) {
-            setTimeout(() => {
-                messageDiv.querySelectorAll('.rag-source-toggle').forEach(btn => {
-                    btn.addEventListener('click', (e) => {
-                        e.preventDefault();
-                        const idx = btn.getAttribute('data-source-idx');
-                        const content = messageDiv.querySelector(`[data-source-content="${idx}"]`);
-                        const chevron = messageDiv.querySelector(`.rag-source-chevron-${idx}`);
-
-                        if (content && chevron) {
-                            content.classList.toggle('hidden');
-                            chevron.classList.toggle('rotate-180');
-                        }
-                    });
-                });
-            }, 0);
-        }
-
-        if (ragMessageCountEl) {
-            const count = parseInt(ragMessageCountEl.textContent || '0') + 1;
-            ragMessageCountEl.textContent = count;
+        if (clubMessageCountEl) {
+            const count = parseInt(clubMessageCountEl.textContent || '0') + 1;
+            clubMessageCountEl.textContent = count;
         }
     }
 
     // Send message
-    async function sendRagMessage(message) {
-        if (!message.trim() || !ragInput || !ragLoading) return;
+    async function sendClubMessage(message) {
+        if (!message.trim() || !clubInput || !clubLoading) return;
 
         // Add user message
-        addRagMessage('user', message);
+        addClubMessage('user', message);
 
         // Clear input and disable
-        ragInput.value = '';
-        ragInput.disabled = true;
+        clubInput.value = '';
+        clubInput.disabled = true;
 
         // Show loading
-        ragLoading.classList.remove('hidden');
+        clubLoading.classList.remove('hidden');
 
         try {
-            const response = await fetch('/chat/rag', {
+            const response = await fetch('/club/chat', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    sessionId: ragSessionId,
-                    message: message,
-                    topK: 5
+                    sessionId: clubSessionId,
+                    message: message
                 })
             });
 
-            ragLoading.classList.add('hidden');
+            clubLoading.classList.add('hidden');
 
             if (!response.ok) {
                 const error = await response.json();
@@ -2766,59 +2705,70 @@ function initRagChat() {
 
             const data = await response.json();
 
-            // Add assistant message with sources
-            addRagMessage('assistant', data.answer, data.sources);
-
-            // Update message count
-            if (ragMessageCountEl && data.messageCount) {
-                ragMessageCountEl.textContent = data.messageCount;
+            // Update session ID if provided
+            if (data.sessionId) {
+                clubSessionId = data.sessionId;
+                if (clubSessionIdEl) {
+                    clubSessionIdEl.textContent = clubSessionId.substring(0, 8) + '...';
+                }
             }
 
+            // Add assistant message
+            addClubMessage('assistant', data.response, data.metadata);
+
         } catch (error) {
-            ragLoading.classList.add('hidden');
+            clubLoading.classList.add('hidden');
             console.error('Error sending message:', error);
-            addRagMessage('assistant', `Ошибка: ${error.message}`, []);
+            addClubMessage('assistant', `Ошибка: ${error.message}`, null);
         } finally {
-            ragInput.disabled = false;
-            ragInput.focus();
+            clubInput.disabled = false;
+            clubInput.focus();
         }
     }
 
     // Clear chat history
-    async function clearRagHistory() {
+    async function clearClubHistory() {
         if (!confirm('Вы уверены, что хотите очистить историю чата?')) {
             return;
         }
 
-        try {
-            const response = await fetch('/chat/rag/clear', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({sessionId: ragSessionId})
-            });
+        // Reset session ID
+        clubSessionId = 'club-session-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
-            if (response.ok && ragMessages && ragMessageCountEl) {
-                // Clear UI
-                ragMessages.innerHTML = `
-                    <div class="flex items-start space-x-4 message">
-                        <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
-                            AI
-                        </div>
-                        <div class="flex-1">
-                            <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
-                            <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
-                                <p class="text-gray-700 leading-relaxed mb-4">
-                                    История очищена! Начните новый диалог.
+        if (clubSessionIdEl) {
+            clubSessionIdEl.textContent = clubSessionId.substring(0, 8) + '...';
+        }
+
+        if (clubMessages && clubMessageCountEl) {
+            // Clear UI
+            clubMessages.innerHTML = `
+                <div class="flex items-start space-x-4 message">
+                    <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
+                        🏃
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">Помощник SportSauce</p>
+                        <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
+                            <p class="text-gray-700 leading-relaxed mb-4">
+                                История очищена! Начните новый диалог.
+                            </p>
+                            <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                <p class="font-semibold mb-3 text-sm" style="color: var(--primary-color);">
+                                    💡 Я могу помочь с:
                                 </p>
+                                <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                    <li>Информацией о тренировках и расписании</li>
+                                    <li>Абонементах и ценах</li>
+                                    <li>Тренерах и их специализации</li>
+                                    <li>Мероприятиях клуба</li>
+                                    <li>Ответами на частые вопросы</li>
+                                </ul>
                             </div>
                         </div>
                     </div>
-                `;
-                ragMessageCountEl.textContent = '0';
-            }
-        } catch (error) {
-            console.error('Error clearing history:', error);
-            alert('Не удалось очистить историю: ' + error.message);
+                </div>
+            `;
+            clubMessageCountEl.textContent = '0';
         }
     }
 
@@ -2830,47 +2780,43 @@ function initRagChat() {
     }
 
     // Event listeners
-    if (ragForm) {
-        ragForm.addEventListener('submit', (e) => {
+    if (clubForm) {
+        clubForm.addEventListener('submit', (e) => {
             e.preventDefault();
-            if (ragInput) {
-                sendRagMessage(ragInput.value);
+            if (clubInput) {
+                sendClubMessage(clubInput.value);
             }
         });
     }
 
-    if (ragClearBtn) {
-        ragClearBtn.addEventListener('click', clearRagHistory);
+    if (clubClearBtn) {
+        clubClearBtn.addEventListener('click', clearClubHistory);
     }
 
-    if (ragQuickPrompts) {
-        ragQuickPrompts.forEach(btn => {
+    if (clubQuickPrompts) {
+        clubQuickPrompts.forEach(btn => {
             btn.addEventListener('click', () => {
-                const question = btn.getAttribute('data-rag-question');
-                if (question && ragInput) {
-                    ragInput.value = question;
-                    if (ragForm) {
-                        ragForm.dispatchEvent(new Event('submit'));
+                const question = btn.getAttribute('data-club-question');
+                if (question && clubInput) {
+                    clubInput.value = question;
+                    if (clubForm) {
+                        clubForm.dispatchEvent(new Event('submit'));
                     }
                 }
             });
         });
     }
 
-    // Initial status check
-    checkRagStatus();
-    setInterval(checkRagStatus, 10000); // Check every 10 seconds
-
-    console.log('RAG chat initialized successfully');
+    console.log('Club chat initialized successfully');
 }
 
-// Initialize RAG chat when DOM is ready
+// Initialize Club chat when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    // Check if RAG tab is active and initialize if needed
-    const ragTab = document.getElementById('tab-rag');
-    const ragContent = document.getElementById('rag-content');
+    // Check if Club tab is active and initialize if needed
+    const clubTab = document.getElementById('tab-club');
+    const clubContent = document.getElementById('club-content');
 
-    if (ragContent && ragContent.classList.contains('active')) {
-        initRagChat();
+    if (clubContent && clubContent.classList.contains('active')) {
+        initClubChat();
     }
 });
