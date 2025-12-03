@@ -1,10 +1,12 @@
 package com.markettwits.aichallenge
 
+import com.markettwits.aichallenge.club.configureClubRoutes
 import com.markettwits.aichallenge.mcp.configureOrchestrationRoutes
 import com.markettwits.aichallenge.rag.*
 import com.markettwits.aichallenge.tools.ToolManager
 import com.markettwits.aichallenge.tools.configureToolRoutes
 import io.github.cdimascio.dotenv.dotenv
+import io.ktor.client.plugins.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -17,6 +19,7 @@ import io.ktor.server.routing.*
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.Database
+import io.ktor.client.plugins.contentnegotiation.ContentNegotiation as ClientContentNegotiation
 
 fun main() {
     val dotenv = dotenv {
@@ -49,7 +52,6 @@ fun main() {
     val repository = ConversationRepository()
     val sessionManager = SessionManager(repository)
 
-    // Initialize reminder services
     val reminderRepository = ReminderRepository()
     val reminderScheduler = ReminderScheduler(reminderRepository, repository)
 
@@ -63,7 +65,7 @@ fun main() {
     println("Initializing reminder services and MCP integration...")
 
     // Start reminder scheduler in background
-    reminderScheduler.start()
+    // reminderScheduler.start()
 
     // MCP integration service ready
     println("✅ MCP Integration Service initialized successfully")
@@ -99,6 +101,9 @@ fun main() {
         }
     }
 
+    // Get project root for file operations
+    val projectRoot = System.getProperty("user.dir")
+
     if (isRagReady) {
         println("✅ RAG system is ready - documentation indexed")
         val stats = ragQueryService.getStats()
@@ -110,7 +115,6 @@ fun main() {
         runBlocking {
             try {
                 // Prepare project documentation directory
-                val projectRoot = System.getProperty("user.dir")
                 val projectDocsDir = java.io.File("$projectRoot/data/project_docs")
                 projectDocsDir.mkdirs()
 
@@ -163,6 +167,64 @@ fun main() {
         }
     }
 
+    // Initialize Club Support System (Day 22)
+    println("🏃 Initializing Club Support System (Day 22)...")
+
+    // Check if club documentation is indexed
+    val hasClubData = runBlocking {
+        try {
+            val stats = ragQueryService.getStats()
+            val files = stats["files"] as? List<*> ?: emptyList<String>()
+            files.any { it.toString().startsWith("club_") }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    if (hasClubData) {
+        println("✅ Club documentation is indexed and ready")
+    } else {
+        println("⚠️  Club documentation not found in RAG")
+        println("   💡 Please run indexing script first: ./scripts/index_club_data.sh")
+    }
+
+    // Create HTTP client for SportSauce API
+    val clubHttpClient = io.ktor.client.HttpClient(io.ktor.client.engine.cio.CIO) {
+        install(ClientContentNegotiation) {
+            json(Json {
+                ignoreUnknownKeys = true
+                isLenient = true
+            })
+        }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 30000
+            connectTimeoutMillis = 10000
+        }
+    }
+
+    val clubApiClient = com.markettwits.aichallenge.sportsauce.club.SportSauceClubsNetworkApiBase(clubHttpClient)
+
+    // Initialize Club Tool Manager
+    val clubToolManager = com.markettwits.aichallenge.tools.ClubToolManager(
+        ragQueryService = ragQueryService,
+        apiClient = clubApiClient
+    )
+
+    println("✅ Club Tool System initialized with ${clubToolManager.registry.getToolCount()} tools")
+    println("📋 Club tools:")
+    clubToolManager.registry.getAllTools().forEach { tool ->
+        println("   - ${tool.name} (${tool.type})")
+    }
+
+    // Initialize Club Support Agent
+    val clubSupportAgent = com.markettwits.aichallenge.club.ClubSupportAgent(
+        anthropicClient = anthropicClient,
+        clubToolManager = clubToolManager
+    )
+
+    println("✅ Club Support Agent initialized successfully")
+    println("🌐 Club Support UI: http://localhost:$port/club-support.html")
+
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
@@ -200,6 +262,12 @@ fun main() {
 
         // Configure Tool System routes (Day 20)
         configureToolRoutes(toolManager)
+
+        // Configure Club Support routes (Day 22)
+        configureClubRoutes(
+            clubSupportAgent = clubSupportAgent,
+            clubToolManager = clubToolManager
+        )
 
         routing {
             staticResources("/", "static")
