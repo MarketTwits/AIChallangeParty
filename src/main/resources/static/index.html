@@ -484,7 +484,7 @@
                     <button class="nav-link text-sm font-medium active-tab" id="tab-training">Тренер</button>
                     <button class="nav-link text-sm font-medium" id="tab-reasoning">Болталка</button>
                     <button class="nav-link text-sm font-medium" id="tab-models">Сравнение моделей</button>
-                    <button class="nav-link text-sm font-medium" id="tab-rag">🤖 RAG Чат</button>
+                    <button class="nav-link text-sm font-medium" id="tab-club">🏃 Поддержка Клуба</button>
                     <button class="nav-link text-sm font-medium" id="tab-reminders">📋 Задачи</button>
                     <a href="https://sportsauce.ru" target="_blank" class="nav-link text-sm font-medium">Главная</a>
                     <a href="https://sportsauce.ru/clubs" target="_blank" class="nav-link text-sm font-medium">Клубы</a>
@@ -1010,55 +1010,61 @@
                     </div>
                 </div>
             </div>
-            <!-- RAG Chat Tab -->
-            <div class="tab-content" id="rag-content">
+            <!-- Club Support Tab -->
+            <div class="tab-content" id="club-content">
                 <div class="chat-container p-6 mb-8">
-                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🤖 RAG Чат с Памятью</h2>
-                    <p class="text-gray-600 mb-6">Умный диалог с базой знаний и историей разговоров</p>
+                    <h2 class="text-2xl font-bold mb-4" style="color: var(--primary-color);">🏃 Поддержка Клуба
+                        SportSauce</h2>
+                    <p class="text-gray-600 mb-6">Помощник по вопросам о тренировках, абонементах и расписании</p>
 
                     <!-- Session Info -->
                     <div class="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                             <div class="text-center">
                                 <div class="font-semibold text-blue-700">Статус системы</div>
-                                <div class="text-gray-700 font-bold" id="rag-status">
-                                    <span class="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-1"></span>
-                                    Проверка...
+                                <div class="text-gray-700 font-bold" id="club-status">
+                                    <span class="inline-block w-2 h-2 bg-green-400 rounded-full mr-1"></span>
+                                    Готов к работе
                                 </div>
                             </div>
                             <div class="text-center">
                                 <div class="font-semibold text-green-700">ID сессии</div>
-                                <div class="text-gray-700 font-mono text-xs" id="rag-session-id">-</div>
+                                <div class="text-gray-700 font-mono text-xs" id="club-session-id">-</div>
                             </div>
                             <div class="text-center">
                                 <div class="font-semibold text-purple-700">Сообщений</div>
-                                <div class="text-gray-700 font-bold" id="rag-message-count">0</div>
+                                <div class="text-gray-700 font-bold" id="club-message-count">0</div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Chat Messages -->
-                    <div class="overflow-y-auto space-y-4 scroll-smooth mb-6" id="rag-messages"
+                    <div class="overflow-y-auto space-y-4 scroll-smooth mb-6" id="club-messages"
                          style="max-height: 500px;">
                         <div class="flex items-start space-x-4 message">
                             <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
-                                AI
+                                🏃
                             </div>
                             <div class="flex-1">
-                                <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">RAG Ассистент</p>
+                                <p class="font-bold text-sm mb-2" style="color: var(--primary-color);">Помощник
+                                    SportSauce</p>
                                 <div class="assistant-message p-5 rounded-2xl rounded-tl-none">
                                     <p class="text-gray-700 leading-relaxed mb-4">
-                                        Привет! 👋 Я могу отвечать на вопросы на основе базы знаний и запоминать историю
-                                        нашего разговора.
+                                        Привет! 👋 Я помощник SportSauce Club и могу ответить на ваши вопросы.
                                     </p>
                                     <div class="bg-blue-50 rounded-xl p-4 border border-blue-100">
                                         <p class="font-semibold mb-3 text-sm" style="color: var(--primary-color);">
-                                            💡 Все ответы включают ссылки на источники
+                                            💡 Я могу помочь с:
                                         </p>
-                                        <p class="text-sm text-gray-600">
-                                            Задайте любой вопрос из базы знаний - я найду релевантную информацию и
-                                            процитирую источники.
-                                        </p>
+                                        <ul class="text-sm text-gray-600 space-y-1 list-disc list-inside">
+                                            <li>Информацией о тренировках и расписании</li>
+                                            <li>Абонементах и ценах</li>
+                                            <li>Тренерах и их специализации</li>
+                                            <li>Мероприятиях клуба</li>
+                                            <li>Ответами на частые вопросы</li>
+                                        </ul>
+                                        <p class="text-blue-600 text-sm mt-3 font-medium">Задавайте любые вопросы о
+                                            клубе!</p>
                                     </div>
                                 </div>
                             </div>
@@ -1066,10 +1072,10 @@
                     </div>
 
                     <!-- Loading Indicator -->
-                    <div class="hidden mb-6" id="rag-loading">
+                    <div class="hidden mb-6" id="club-loading">
                         <div class="flex items-start space-x-4">
                             <div class="avatar rounded-full w-10 h-10 flex items-center justify-center flex-shrink-0 font-bold text-sm text-white">
-                                AI
+                                🏃
                             </div>
                             <div class="assistant-message p-4 rounded-2xl rounded-tl-none">
                                 <div class="loading-dots flex space-x-2">
@@ -1083,13 +1089,13 @@
 
                     <!-- Input Area -->
                     <div class="border-t border-gray-200 pt-6">
-                        <form class="space-y-4" id="rag-form">
+                        <form class="space-y-4" id="club-form">
                             <div class="flex space-x-3">
                                 <input
                                         autocomplete="off"
                                         class="flex-1 px-5 py-4 rounded-xl font-medium"
-                                        id="rag-input"
-                                        placeholder="Задайте любой вопрос из базы знаний..."
+                                        id="club-input"
+                                        placeholder="Напишите ваш вопрос о клубе..."
                                         type="text"
                                 />
                                 <button
@@ -1104,23 +1110,31 @@
                                 </button>
                             </div>
                             <div class="flex flex-wrap gap-2">
-                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Что такое свиноводство?"
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold"
+                                        data-club-question="Кто сейчас проводит тренировки по бегу?"
                                         type="button">
-                                    🐷 Что такое свиноводство?
+                                    🏃 Кто ведет тренировки по бегу?
                                 </button>
-                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Как разводить свиней?"
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold"
+                                        data-club-question="Какое расписание тренировок на эту неделю?"
                                         type="button">
-                                    🏭 Как разводить свиней?
+                                    📅 Расписание тренировок
                                 </button>
-                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold" data-rag-question="Расскажи о животноводстве"
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold"
+                                        data-club-question="Какие абонементы доступны?"
                                         type="button">
-                                    🌾 Расскажи о животноводстве
+                                    💳 Доступные абонементы
+                                </button>
+                                <button class="quick-prompt px-4 py-2.5 rounded-xl text-sm font-semibold"
+                                        data-club-question="Какие мероприятия запланированы?"
+                                        type="button">
+                                    🎉 Мероприятия клуба
                                 </button>
                             </div>
                             <div class="mt-4">
                                 <button
                                         class="w-full bg-red-500 hover:bg-red-600 text-white px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center space-x-2"
-                                        id="rag-clear-btn"
+                                        id="club-clear-btn"
                                         type="button"
                                 >
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

@@ -59,8 +59,8 @@ fun Application.configureRouting(
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
     val mcpAgents = mutableMapOf<String, McpAgent>()
     val reminderMcpServer = ReminderMcpServer(reminderRepository)
-    // val llmSummarizer = AdvancedLLMSummarizer(anthropicClient, reminderRepository, repository)
-    // val realMcpDemo = RealMcpDemo(reminderRepository, anthropicClient)
+    //val llmSummarizer = AdvancedLLMSummarizer(anthropicClient, reminderRepository, repository)
+    //val realMcpDemo = RealMcpDemo(reminderRepository, anthropicClient)
 
     val hfKeyMasked = if (huggingFaceKey.length > 8) {
         "${huggingFaceKey.substring(0, 8)}...${huggingFaceKey.substring(huggingFaceKey.length - 4)}"
