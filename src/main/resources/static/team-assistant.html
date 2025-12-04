@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Team Assistant - Support Tickets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes slideIn {
+            from {
+                transform: translateY(10px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .slide-in {
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .ticket-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+        }
+
+        .priority-critical {
+            border-left: 4px solid #ef4444;
+        }
+
+        .priority-high {
+            border-left: 4px solid #f97316;
+        }
+
+        .priority-medium {
+            border-left: 4px solid #eab308;
+        }
+
+        .priority-low {
+            border-left: 4px solid #22c55e;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 min-h-screen text-white">
+
+<!-- Header -->
+<header class="glass border-b border-white/20">
+    <div class="container mx-auto px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                    <span class="text-2xl">🎫</span>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold">Team Assistant</h1>
+                    <p class="text-sm text-gray-300">AI-Powered Support Ticket System</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2 px-4 py-2 bg-green-500/20 rounded-lg" id="systemStatus">
+                    <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span class="text-sm">System Online</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<div class="container mx-auto px-6 py-8">
+
+    <!-- Action Bar -->
+    <div class="mb-8 glass rounded-xl p-6">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-center space-x-4">
+                <button class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold hover:shadow-lg transition-all duration-300 hover:scale-105" id="processBtn"
+                        onclick="processRequests()">
+                    🚀 Process Support Requests
+                </button>
+                <button class="px-6 py-3 bg-blue-500/20 hover:bg-blue-500/30 rounded-lg font-semibold transition-all"
+                        onclick="refreshTickets()">
+                    🔄 Refresh
+                </button>
+                <button class="px-6 py-3 bg-green-500/20 hover:bg-green-500/30 rounded-lg font-semibold transition-all"
+                        onclick="openChatModal()">
+                    💬 Chat with AI
+                </button>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Filter Buttons -->
+                <select class="px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" id="priorityFilter"
+                        onchange="applyFilters()">
+                    <option value="">All Priorities</option>
+                    <option value="CRITICAL">🔴 Critical</option>
+                    <option value="HIGH">🟠 High</option>
+                    <option value="MEDIUM">🟡 Medium</option>
+                    <option value="LOW">🟢 Low</option>
+                </select>
+                <select class="px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" id="statusFilter"
+                        onchange="applyFilters()">
+                    <option value="">All Status</option>
+                    <option value="NEW">🆕 New</option>
+                    <option value="IN_PROGRESS">⚡ In Progress</option>
+                    <option value="RESOLVED">✅ Resolved</option>
+                    <option value="CLOSED">🔒 Closed</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8" id="statistics">
+        <!-- Will be populated by JS -->
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+
+        <!-- Tickets List (2/3 width) -->
+        <div class="lg:col-span-2">
+            <div class="glass rounded-xl p-6">
+                <h2 class="text-2xl font-bold mb-6 flex items-center">
+                    <span class="mr-3">📋</span>
+                    Support Tickets
+                    <span class="ml-3 px-3 py-1 bg-purple-500/30 rounded-full text-sm" id="ticketCount">0</span>
+                </h2>
+
+                <div class="space-y-4 max-h-[800px] overflow-y-auto pr-2" id="ticketsList">
+                    <!-- Will be populated by JS -->
+                    <div class="text-center py-12 text-gray-400">
+                        <p class="text-lg">No tickets loaded yet</p>
+                        <p class="text-sm mt-2">Click "Process Support Requests" to start</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Processing Log (1/3 width) -->
+        <div class="lg:col-span-1">
+            <div class="glass rounded-xl p-6">
+                <h2 class="text-xl font-bold mb-4 flex items-center">
+                    <span class="mr-2">📊</span>
+                    Activity Log
+                </h2>
+                <div class="space-y-2 max-h-[800px] overflow-y-auto text-sm" id="activityLog">
+                    <div class="text-gray-400 text-center py-8">
+                        No activity yet
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chat Modal -->
+<div class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" id="chatModal">
+    <div class="glass rounded-xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="p-6 border-b border-white/20 flex items-center justify-between">
+            <h3 class="text-2xl font-bold flex items-center">
+                <span class="mr-3">🤖</span>
+                AI Assistant Chat
+            </h3>
+            <button class="text-gray-400 hover:text-white text-2xl" onclick="closeChatModal()">&times;</button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-6 space-y-4" id="chatMessages">
+            <div class="bg-blue-500/20 rounded-lg p-4 slide-in">
+                <p class="text-sm text-gray-300 mb-1">AI Assistant</p>
+                <p>👋 Hello! I can help you with:</p>
+                <ul class="list-disc list-inside mt-2 text-sm">
+                    <li>Processing support requests</li>
+                    <li>Viewing and filtering tickets</li>
+                    <li>Updating ticket priorities and status</li>
+                    <li>Searching project documentation</li>
+                </ul>
+            </div>
+        </div>
+        <div class="p-6 border-t border-white/20">
+            <form class="flex space-x-2" onsubmit="sendChatMessage(event)">
+                <input class="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" id="chatInput" placeholder="Ask me anything..."
+                       type="text">
+                <button class="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold hover:shadow-lg transition-all"
+                        type="submit">
+                    Send
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Ticket Modal -->
+<div class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" id="editModal">
+    <div class="glass rounded-xl w-full max-w-md">
+        <div class="p-6 border-b border-white/20 flex items-center justify-between">
+            <h3 class="text-xl font-bold">Edit Ticket</h3>
+            <button class="text-gray-400 hover:text-white text-2xl" onclick="closeEditModal()">&times;</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <input id="editTicketId" type="hidden">
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Priority</label>
+                <select class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        id="editPriority">
+                    <option value="CRITICAL">🔴 Critical</option>
+                    <option value="HIGH">🟠 High</option>
+                    <option value="MEDIUM">🟡 Medium</option>
+                    <option value="LOW">🟢 Low</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Status</label>
+                <select class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        id="editStatus">
+                    <option value="NEW">🆕 New</option>
+                    <option value="IN_PROGRESS">⚡ In Progress</option>
+                    <option value="RESOLVED">✅ Resolved</option>
+                    <option value="CLOSED">🔒 Closed</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Assignee</label>
+                <input class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" id="editAssignee" placeholder="Enter name..."
+                       type="text">
+            </div>
+
+            <div>
+                <label class="block text-sm font-semibold mb-2">Notes</label>
+                <textarea class="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" id="editNotes" placeholder="Internal notes..."
+                          rows="3"></textarea>
+            </div>
+
+            <div class="flex space-x-3 pt-4">
+                <button class="flex-1 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg font-semibold hover:shadow-lg"
+                        onclick="saveTicket()">
+                    Save Changes
+                </button>
+                <button class="px-4 py-2 bg-gray-500/20 hover:bg-gray-500/30 rounded-lg font-semibold"
+                        onclick="closeEditModal()">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let tickets = [];
+    let filteredTickets = [];
+    let sessionId = 'session-' + Date.now();
+
+    // Initialize
+    window.onload = () => {
+        loadStatistics();
+        refreshTickets();
+    };
+
+    // Add activity log entry
+    function addLog(message, type = 'info') {
+        const log = document.getElementById('activityLog');
+        const entry = document.createElement('div');
+        entry.className = `p-3 rounded-lg slide-in ${
+            type === 'success' ? 'bg-green-500/20' :
+                type === 'error' ? 'bg-red-500/20' :
+                    type === 'warning' ? 'bg-yellow-500/20' :
+                        'bg-blue-500/20'
+        }`;
+        entry.innerHTML = `
+                <div class="flex items-start space-x-2">
+                    <span class="text-xs text-gray-400">${new Date().toLocaleTimeString()}</span>
+                    <span class="flex-1">${message}</span>
+                </div>
+            `;
+        log.insertBefore(entry, log.firstChild);
+
+        // Keep only last 50 entries
+        while (log.children.length > 50) {
+            log.removeChild(log.lastChild);
+        }
+    }
+
+    // Process Support Requests
+    async function processRequests() {
+        const btn = document.getElementById('processBtn');
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner inline-block w-5 h-5 border-2 border-white/30 border-t-white rounded-full"></span> Processing...';
+
+        addLog('🚀 Starting AI-powered request processing...', 'info');
+
+        try {
+            const response = await fetch('/team/tickets/process', {method: 'POST'});
+            const data = await response.json();
+
+            if (response.ok) {
+                addLog(`✅ Processed ${data.totalProcessed} requests`, 'success');
+                addLog(`   • Valid tickets: ${data.validTickets}`, 'success');
+                addLog(`   • Spam filtered: ${data.spamFiltered}`, 'warning');
+                addLog(`   • User errors: ${data.userErrorsDetected}`, 'info');
+
+                await refreshTickets();
+                await loadStatistics();
+            } else {
+                throw new Error(data.error || 'Processing failed');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            addLog(`❌ Error: ${error.message}`, 'error');
+            alert('Failed to process requests: ' + error.message);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '🚀 Process Support Requests';
+        }
+    }
+
+    // Load Statistics
+    async function loadStatistics() {
+        try {
+            const response = await fetch('/team/statistics');
+            const stats = await response.json();
+
+            const statsHTML = `
+                    <div class="glass rounded-xl p-6 slide-in">
+                        <div class="text-3xl font-bold text-purple-400">${stats.total || 0}</div>
+                        <div class="text-sm text-gray-300 mt-1">Total Tickets</div>
+                    </div>
+                    <div class="glass rounded-xl p-6 slide-in">
+                        <div class="text-3xl font-bold text-red-400">${stats.byPriority?.CRITICAL || 0}</div>
+                        <div class="text-sm text-gray-300 mt-1">🔴 Critical</div>
+                    </div>
+                    <div class="glass rounded-xl p-6 slide-in">
+                        <div class="text-3xl font-bold text-orange-400">${stats.byPriority?.HIGH || 0}</div>
+                        <div class="text-sm text-gray-300 mt-1">🟠 High Priority</div>
+                    </div>
+                    <div class="glass rounded-xl p-6 slide-in">
+                        <div class="text-3xl font-bold text-green-400">${stats.byStatus?.RESOLVED || 0}</div>
+                        <div class="text-sm text-gray-300 mt-1">✅ Resolved</div>
+                    </div>
+                `;
+
+            document.getElementById('statistics').innerHTML = statsHTML;
+        } catch (error) {
+            console.error('Error loading statistics:', error);
+        }
+    }
+
+    // Refresh Tickets
+    async function refreshTickets() {
+        addLog('🔄 Refreshing ticket list...', 'info');
+
+        try {
+            const response = await fetch('/team/tickets');
+            const data = await response.json();
+
+            tickets = data.tickets || [];
+            applyFilters();
+
+            addLog(`📋 Loaded ${tickets.length} tickets`, 'success');
+        } catch (error) {
+            console.error('Error:', error);
+            addLog(`❌ Failed to load tickets: ${error.message}`, 'error');
+        }
+    }
+
+    // Apply Filters
+    function applyFilters() {
+        const priority = document.getElementById('priorityFilter').value;
+        const status = document.getElementById('statusFilter').value;
+
+        filteredTickets = tickets.filter(ticket => {
+            if (priority && ticket.priority !== priority) return false;
+            if (status && ticket.status !== status) return false;
+            return true;
+        });
+
+        renderTickets();
+    }
+
+    // Render Tickets
+    function renderTickets() {
+        const container = document.getElementById('ticketsList');
+        document.getElementById('ticketCount').textContent = filteredTickets.length;
+
+        if (filteredTickets.length === 0) {
+            container.innerHTML = '<div class="text-center py-12 text-gray-400">No tickets match the current filters</div>';
+            return;
+        }
+
+        container.innerHTML = filteredTickets.map(ticket => {
+            const priorityEmoji = {
+                'CRITICAL': '🔴',
+                'HIGH': '🟠',
+                'MEDIUM': '🟡',
+                'LOW': '🟢'
+            }[ticket.priority] || '⚪';
+
+            const statusEmoji = {
+                'NEW': '🆕',
+                'IN_PROGRESS': '⚡',
+                'RESOLVED': '✅',
+                'CLOSED': '🔒'
+            }[ticket.status] || '📌';
+
+            return `
+                    <div class="ticket-card priority-${ticket.priority.toLowerCase()} bg-white/5 rounded-lg p-5 transition-all duration-300 slide-in">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center space-x-2 mb-2">
+                                    <span class="text-2xl">${priorityEmoji}</span>
+                                    <span class="font-mono text-sm text-gray-400">#${ticket.id}</span>
+                                    <span class="px-2 py-1 bg-purple-500/30 rounded text-xs">${ticket.classification.category}</span>
+                                </div>
+                                <h3 class="text-lg font-semibold mb-2">${ticket.originalRequest.subject}</h3>
+                                <p class="text-sm text-gray-300 mb-3">${ticket.originalRequest.message.substring(0, 150)}${ticket.originalRequest.message.length > 150 ? '...' : ''}</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-between text-sm">
+                            <div class="space-y-1">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-gray-400">From:</span>
+                                    <span class="font-semibold">${ticket.originalRequest.userName}</span>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <span>${statusEmoji} ${ticket.status}</span>
+                                    <span>${priorityEmoji} ${ticket.priority}</span>
+                                    ${ticket.assignee ? `<span>👤 ${ticket.assignee}</span>` : '<span class="text-gray-500">Unassigned</span>'}
+                                </div>
+                            </div>
+
+                            <div class="flex items-center space-x-2">
+                                <button onclick='editTicket(${JSON.stringify(ticket).replace(/'/g, "&apos;")})'
+                                    class="px-3 py-1 bg-blue-500/20 hover:bg-blue-500/30 rounded text-sm transition-all">
+                                    ✏️ Edit
+                                </button>
+                                <button onclick="deleteTicket('${ticket.id}')"
+                                    class="px-3 py-1 bg-red-500/20 hover:bg-red-500/30 rounded text-sm transition-all">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </div>
+
+                        ${ticket.classification.reasoning ? `
+                            <div class="mt-3 pt-3 border-t border-white/10">
+                                <p class="text-xs text-gray-400">
+                                    <span class="font-semibold">AI Analysis:</span> ${ticket.classification.reasoning}
+                                </p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+        }).join('');
+    }
+
+    // Edit Ticket
+    function editTicket(ticket) {
+        document.getElementById('editTicketId').value = ticket.id;
+        document.getElementById('editPriority').value = ticket.priority;
+        document.getElementById('editStatus').value = ticket.status;
+        document.getElementById('editAssignee').value = ticket.assignee || '';
+        document.getElementById('editNotes').value = ticket.notes || '';
+        document.getElementById('editModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('editModal').classList.add('hidden');
+    }
+
+    async function saveTicket() {
+        const ticketId = document.getElementById('editTicketId').value;
+        const data = {
+            priority: document.getElementById('editPriority').value,
+            status: document.getElementById('editStatus').value,
+            assignee: document.getElementById('editAssignee').value || null,
+            notes: document.getElementById('editNotes').value || null
+        };
+
+        try {
+            const response = await fetch(`/team/tickets/${ticketId}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                addLog(`✅ Updated ticket #${ticketId}`, 'success');
+                closeEditModal();
+                await refreshTickets();
+            } else {
+                throw new Error('Update failed');
+            }
+        } catch (error) {
+            addLog(`❌ Failed to update ticket: ${error.message}`, 'error');
+            alert('Failed to update ticket');
+        }
+    }
+
+    // Delete Ticket
+    async function deleteTicket(ticketId) {
+        if (!confirm(`Are you sure you want to delete ticket #${ticketId}?`)) return;
+
+        try {
+            const response = await fetch(`/team/tickets/${ticketId}`, {method: 'DELETE'});
+
+            if (response.ok) {
+                addLog(`🗑️ Deleted ticket #${ticketId}`, 'warning');
+                await refreshTickets();
+                await loadStatistics();
+            } else {
+                throw new Error('Delete failed');
+            }
+        } catch (error) {
+            addLog(`❌ Failed to delete ticket: ${error.message}`, 'error');
+            alert('Failed to delete ticket');
+        }
+    }
+
+    // Chat Functions
+    function openChatModal() {
+        document.getElementById('chatModal').classList.remove('hidden');
+    }
+
+    function closeChatModal() {
+        document.getElementById('chatModal').classList.add('hidden');
+    }
+
+    async function sendChatMessage(event) {
+        event.preventDefault();
+
+        const input = document.getElementById('chatInput');
+        const message = input.value.trim();
+        if (!message) return;
+
+        const messagesContainer = document.getElementById('chatMessages');
+
+        // Add user message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'bg-purple-500/20 rounded-lg p-4 ml-8 slide-in';
+        userMsg.innerHTML = `
+                <p class="text-sm text-gray-300 mb-1 text-right">You</p>
+                <p>${message}</p>
+            `;
+        messagesContainer.appendChild(userMsg);
+        input.value = '';
+
+        // Add loading indicator
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'bg-blue-500/20 rounded-lg p-4 mr-8 slide-in';
+        loadingMsg.innerHTML = `
+                <p class="text-sm text-gray-300 mb-1">AI Assistant</p>
+                <div class="flex items-center space-x-2">
+                    <div class="spinner w-4 h-4 border-2 border-white/30 border-t-white rounded-full"></div>
+                    <span>Thinking...</span>
+                </div>
+            `;
+        messagesContainer.appendChild(loadingMsg);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+        try {
+            const response = await fetch('/team/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message, sessionId})
+            });
+
+            const data = await response.json();
+            loadingMsg.remove();
+
+            const aiMsg = document.createElement('div');
+            aiMsg.className = 'bg-blue-500/20 rounded-lg p-4 mr-8 slide-in';
+            aiMsg.innerHTML = `
+                    <p class="text-sm text-gray-300 mb-1">AI Assistant</p>
+                    <p class="whitespace-pre-wrap">${data.response}</p>
+                    ${data.toolsUsed && data.toolsUsed.length > 0 ? `
+                        <div class="mt-2 text-xs text-gray-400">
+                            Tools used: ${data.toolsUsed.join(', ')}
+                        </div>
+                    ` : ''}
+                `;
+            messagesContainer.appendChild(aiMsg);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+            // Refresh data if tools were used
+            if (data.toolsUsed && data.toolsUsed.length > 0) {
+                await refreshTickets();
+                await loadStatistics();
+            }
+
+        } catch (error) {
+            loadingMsg.remove();
+            const errorMsg = document.createElement('div');
+            errorMsg.className = 'bg-red-500/20 rounded-lg p-4 mr-8 slide-in';
+            errorMsg.innerHTML = `
+                    <p class="text-sm text-gray-300 mb-1">Error</p>
+                    <p>Failed to send message: ${error.message}</p>
+                `;
+            messagesContainer.appendChild(errorMsg);
+        }
+    }
+</script>
+</body>
+</html>

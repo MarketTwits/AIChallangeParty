@@ -3,6 +3,10 @@ package com.markettwits.aichallenge
 import com.markettwits.aichallenge.club.configureClubRoutes
 import com.markettwits.aichallenge.mcp.configureOrchestrationRoutes
 import com.markettwits.aichallenge.rag.*
+import com.markettwits.aichallenge.team.TeamAssistantAgent
+import com.markettwits.aichallenge.team.TicketProcessor
+import com.markettwits.aichallenge.team.configureTeamRoutes
+import com.markettwits.aichallenge.tools.TeamToolManager
 import com.markettwits.aichallenge.tools.ToolManager
 import com.markettwits.aichallenge.tools.configureToolRoutes
 import io.github.cdimascio.dotenv.dotenv
@@ -225,6 +229,36 @@ fun main() {
     println("✅ Club Support Agent initialized successfully")
     println("🌐 Club Support UI: http://localhost:$port/club-support.html")
 
+    // Initialize Team Assistant System (Day 23)
+    println("👥 Initializing Team Assistant System (Day 23)...")
+
+    // Create ticket processor with AI-powered classification
+    val ticketProcessor = TicketProcessor(
+        anthropicClient = anthropicClient,
+        dataDir = "$projectRoot/data"
+    )
+
+    // Initialize Team Tool Manager with RAG and ticket processor
+    val teamToolManager = TeamToolManager(
+        ticketProcessor = ticketProcessor,
+        ragQueryService = ragQueryService
+    )
+
+    println("✅ Team Tool System initialized with ${teamToolManager.getRegistry().getToolCount()} tools")
+    println("📋 Team tools:")
+    for (tool in teamToolManager.getRegistry().getAllTools()) {
+        println("   - ${tool.name} (${tool.type})")
+    }
+
+    // Initialize Team Assistant Agent
+    val teamAssistantAgent = TeamAssistantAgent(
+        anthropicClient = anthropicClient,
+        teamToolManager = teamToolManager
+    )
+
+    println("✅ Team Assistant Agent initialized successfully")
+    println("🌐 Team Assistant UI: http://localhost:$port/team-assistant.html")
+
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
@@ -267,6 +301,13 @@ fun main() {
         configureClubRoutes(
             clubSupportAgent = clubSupportAgent,
             clubToolManager = clubToolManager
+        )
+
+        // Configure Team Assistant routes (Day 23)
+        configureTeamRoutes(
+            teamAssistant = teamAssistantAgent,
+            teamToolManager = teamToolManager,
+            ticketProcessor = ticketProcessor
         )
 
         routing {
