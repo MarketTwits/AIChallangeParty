@@ -9,6 +9,8 @@ import com.markettwits.aichallenge.team.configureTeamRoutes
 import com.markettwits.aichallenge.tools.TeamToolManager
 import com.markettwits.aichallenge.tools.ToolManager
 import com.markettwits.aichallenge.tools.configureToolRoutes
+import com.markettwits.aichallenge.whatsnew.WhatsNewService
+import com.markettwits.aichallenge.whatsnew.configureWhatsNewRoutes
 import io.github.cdimascio.dotenv.dotenv
 import io.ktor.client.plugins.*
 import io.ktor.http.*
@@ -259,6 +261,12 @@ fun main() {
     println("✅ Team Assistant Agent initialized successfully")
     println("🌐 Team Assistant UI: http://localhost:$port/team-assistant.html")
 
+    // Initialize What's New generator (Day 24)
+    val whatsNewService = WhatsNewService(
+        anthropicClient = anthropicClient,
+        repositoryPath = projectRoot
+    )
+
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
@@ -309,6 +317,9 @@ fun main() {
             teamToolManager = teamToolManager,
             ticketProcessor = ticketProcessor
         )
+
+        // Configure What's New routes (Day 24)
+        configureWhatsNewRoutes(whatsNewService)
 
         routing {
             staticResources("/", "static")

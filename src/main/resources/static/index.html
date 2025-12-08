@@ -1298,6 +1298,26 @@
                 </div>
             </div>
         </div>
+
+        <!-- What's New Section -->
+        <section class="container mx-auto px-6 py-12" id="whats-new">
+            <div class="max-w-5xl mx-auto bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+                <div class="flex items-center justify-between mb-6">
+                    <div>
+                        <p class="text-sm text-gray-500 uppercase tracking-wide">Обновления продукта</p>
+                        <h2 class="text-2xl font-black" style="color: var(--primary-color);">Что нового</h2>
+                    </div>
+                    <span class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700"
+                          id="whats-new-branch">
+                        Загрузка...
+                    </span>
+                </div>
+                <div class="space-y-3 text-gray-800" id="whats-new-list">
+                    <p class="text-gray-500">Загружаем свежие обновления...</p>
+                </div>
+                <div class="mt-4 text-sm text-gray-500" id="whats-new-meta"></div>
+            </div>
+        </section>
     </main>
 
     <!-- Footer -->
@@ -1390,6 +1410,49 @@
         </div>
     </div>
 
+    <script>
+        async function loadWhatsNew() {
+            const listEl = document.getElementById('whats-new-list');
+            const branchEl = document.getElementById('whats-new-branch');
+            const metaEl = document.getElementById('whats-new-meta');
+            if (!listEl) return;
+
+            try {
+                const response = await fetch('/whats-new/latest');
+                if (!response.ok) throw new Error('not found');
+
+                const data = await response.json();
+                const items = data.items || [];
+
+                branchEl.textContent = `${data.baseBranch || 'base'} → ${data.headBranch || 'head'}`;
+                metaEl.textContent = data.generatedAt
+                    ? `Обновлено: ${new Date(data.generatedAt).toLocaleString()}`
+                    : '';
+
+                if (items.length === 0) {
+                    listEl.innerHTML = '<p class="text-gray-500">Пока нет свежих изменений.</p>';
+                    return;
+                }
+
+                listEl.innerHTML = '';
+                items.forEach(item => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-start space-x-3';
+                    row.innerHTML = `
+                        <div class="w-2.5 h-2.5 mt-2 rounded-full" style="background: var(--accent-color);"></div>
+                        <p class="leading-relaxed">${item.text}</p>
+                    `;
+                    listEl.appendChild(row);
+                });
+            } catch (e) {
+                console.error('Failed to load whats-new', e);
+                branchEl.textContent = 'Нет данных';
+                listEl.innerHTML = '<p class="text-gray-500">Не удалось загрузить обновления. Попробуйте позже.</p>';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', loadWhatsNew);
+    </script>
     <script src="script.js?v=20251123-3"></script>
 </body>
 </html>
