@@ -46,6 +46,9 @@ fun main() {
         System.setProperty("GITHUB_TOKEN", gitHubToken)
     }
 
+    // Load Local LLM URL (optional, for Day 26)
+    val localLlmUrl = dotenv["LOCAL_LLM_URL"] ?: System.getenv("LOCAL_LLM_URL") ?: ""
+
     println("Loaded API Keys:")
     println("  ANTHROPIC_API_KEY: ${apiKey.take(10)}... (length: ${apiKey.length})")
     println("  HUGGINGFACE_API_KEY: ${huggingFaceKey.take(10)}... (length: ${huggingFaceKey.length})")
@@ -53,6 +56,11 @@ fun main() {
         println("  GITHUB_TOKEN: ${gitHubToken.take(10)}...${gitHubToken.takeLast(4)} (length: ${gitHubToken.length})")
     } else {
         println("  GITHUB_TOKEN: Not configured")
+    }
+    if (localLlmUrl.isNotEmpty()) {
+        println("  LOCAL_LLM_URL: $localLlmUrl")
+    } else {
+        println("  LOCAL_LLM_URL: Not configured (local coach will not be available)")
     }
 
     val repository = ConversationRepository()
@@ -261,6 +269,42 @@ fun main() {
     println("✅ Team Assistant Agent initialized successfully")
     println("🌐 Team Assistant UI: http://localhost:$port/team-assistant.html")
 
+    // Initialize Local Coach Agent (Day 26)
+    var localCoachAgent: LocalCoachAgent? = null
+    if (localLlmUrl.isNotEmpty()) {
+        println("🤖 Initializing Local Coach Agent (Day 26)...")
+        try {
+            val lmStudioClient = LMStudioClient(localLlmUrl)
+
+            // Test connection
+            val isAvailable = runBlocking {
+                try {
+                    lmStudioClient.isAvailable()
+                } catch (e: Exception) {
+                    println("⚠️  Failed to connect to LM Studio: ${e.message}")
+                    false
+                }
+            }
+
+            if (isAvailable) {
+                localCoachAgent = LocalCoachAgent(lmStudioClient)
+                val models = runBlocking { lmStudioClient.listModels() }
+                println("✅ Local Coach Agent initialized successfully")
+                println("   📊 Available models: ${models.joinToString(", ")}")
+                println("🌐 Local Coach UI: http://localhost:$port/local-coach.html")
+            } else {
+                println("⚠️  LM Studio is not available at $localLlmUrl")
+                println("   💡 Make sure LM Studio is running and accessible")
+            }
+        } catch (e: Exception) {
+            println("❌ Failed to initialize Local Coach Agent: ${e.message}")
+            e.printStackTrace()
+        }
+    } else {
+        println("⚠️  LOCAL_LLM_URL not configured - Local Coach Agent disabled")
+        println("   💡 Add LOCAL_LLM_URL to .env to enable local AI coach")
+    }
+
     // Initialize What's New generator (Day 24)
     val whatsNewService = WhatsNewService(
         anthropicClient = anthropicClient,
@@ -293,7 +337,9 @@ fun main() {
             reminderRepository,
             reminderScheduler,
             mcpIntegrationService,
-            anthropicClient
+            anthropicClient,
+            localCoachAgent,
+            localLlmUrl
         )
 
         // Configure MCP Orchestration routes (Day 14)

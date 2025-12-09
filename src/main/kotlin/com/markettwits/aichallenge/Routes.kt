@@ -54,6 +54,8 @@ fun Application.configureRouting(
     reminderScheduler: ReminderScheduler,
     mcpIntegrationService: DemoMcpIntegration,
     anthropicClient: AnthropicClient,
+    localCoachAgent: LocalCoachAgent? = null,
+    localLlmUrl: String = "",
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
@@ -1448,6 +1450,118 @@ fun Application.configureRouting(
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to e.message)
+                )
+            }
+        }
+
+        // Local Coach Agent endpoints (Day 26)
+        if (localCoachAgent != null) {
+            post("/local-coach/chat") {
+                try {
+                    val request = call.receive<LocalChatRequest>()
+                    logger.info("Received local coach chat request from session ${request.sessionId}: ${request.message}")
+
+                    val response = localCoachAgent.chat(
+                        sessionId = request.sessionId,
+                        userMessage = request.message,
+                        temperature = request.temperature,
+                        modelName = request.model
+                    )
+
+                    call.respond(HttpStatusCode.OK, response)
+                } catch (e: Exception) {
+                    logger.error("Error processing local coach chat request", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        LocalChatResponse(
+                            response = "Error: ${e.message}",
+                            sessionId = "",
+                            messageCount = 0
+                        )
+                    )
+                }
+            }
+
+            get("/local-coach/models") {
+                try {
+                    if (localLlmUrl.isNotEmpty()) {
+                        logger.info("Fetching models from: $localLlmUrl")
+                        val tempClient = LMStudioClient(localLlmUrl)
+                        val models = tempClient.listModels()
+                        tempClient.close()
+
+                        call.respond(
+                            HttpStatusCode.OK,
+                            LocalModelsResponse(
+                                models = models,
+                                count = models.size
+                            )
+                        )
+                    } else {
+                        logger.warn("LOCAL_LLM_URL is not configured")
+                        call.respond(
+                            HttpStatusCode.OK,
+                            LocalModelsResponse(
+                                models = emptyList(),
+                                count = 0,
+                                error = "LOCAL_LLM_URL not configured"
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    logger.error("Error getting models list from $localLlmUrl", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        LocalModelsResponse(
+                            models = emptyList(),
+                            count = 0,
+                            error = e.message
+                        )
+                    )
+                }
+            }
+
+            post("/local-coach/clear") {
+                try {
+                    val sessionId = call.receive<Map<String, String>>()["sessionId"] ?: ""
+                    localCoachAgent.clearSession(sessionId)
+                    call.respond(HttpStatusCode.OK, mapOf("status" to "cleared"))
+                } catch (e: Exception) {
+                    logger.error("Error clearing local coach session", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to e.message)
+                    )
+                }
+            }
+
+            get("/local-coach/status") {
+                try {
+                    val status = LocalStatusResponse(
+                        available = true,
+                        sessionCount = localCoachAgent.getSessionCount()
+                    )
+                    call.respond(HttpStatusCode.OK, status)
+                } catch (e: Exception) {
+                    logger.error("Error getting local coach status", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        LocalStatusResponse(
+                            available = false,
+                            message = e.message
+                        )
+                    )
+                }
+            }
+        } else {
+            // Return unavailable status if agent is not initialized
+            get("/local-coach/status") {
+                call.respond(
+                    HttpStatusCode.OK,
+                    LocalStatusResponse(
+                        available = false,
+                        message = "Local LLM is not configured. Please set LOCAL_LLM_URL in .env"
+                    )
                 )
             }
         }
