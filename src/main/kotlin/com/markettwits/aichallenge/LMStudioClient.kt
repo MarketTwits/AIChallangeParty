@@ -3,6 +3,7 @@ package com.markettwits.aichallenge
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
+import io.ktor.client.plugins.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
@@ -10,7 +11,7 @@ import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.*
 import org.slf4j.LoggerFactory
 
 @Serializable
@@ -57,9 +58,15 @@ data class LMStudioUsage(
 )
 
 @Serializable
+data class LMStudioModelInfo(
+    val name: String,
+    val model: String? = null,
+)
+
+@Serializable
 data class LMStudioModelsResponse(
     val data: List<LMStudioModel> = emptyList(),
-    val models: List<String> = emptyList(), // Alternative format
+    val models: List<String> = emptyList(), // Legacy format (LM Studio) - array of strings
 )
 
 @Serializable
@@ -89,6 +96,11 @@ class LMStudioClient(private val baseUrl: String) {
         install(ContentNegotiation) {
             json(json)
         }
+        install(HttpTimeout) {
+            requestTimeoutMillis = 120_000 // 2 minutes for chat completions
+            connectTimeoutMillis = 30_000  // 30 seconds for connection
+            socketTimeoutMillis = 120_000  // 2 minutes for socket read
+        }
     }
 
     suspend fun listModels(): List<String> {
@@ -102,18 +114,36 @@ class LMStudioClient(private val baseUrl: String) {
                 logger.info("Models endpoint response (${responseText.length} chars): ${responseText.take(200)}")
 
                 try {
-                    val modelsResponse = json.decodeFromString<LMStudioModelsResponse>(responseText)
+                    val jsonElement = json.parseToJsonElement(responseText).jsonObject
 
                     // Try to get models from 'data' field first (OpenAI format)
-                    if (modelsResponse.data.isNotEmpty()) {
-                        logger.info("Found ${modelsResponse.data.size} models in 'data' field")
-                        return modelsResponse.data.map { it.id }
+                    val dataField = jsonElement["data"]?.jsonArray
+                    if (dataField != null && dataField.isNotEmpty()) {
+                        val modelIds = dataField.mapNotNull { element ->
+                            element.jsonObject["id"]?.jsonPrimitive?.content
+                        }
+                        if (modelIds.isNotEmpty()) {
+                            logger.info("Found ${modelIds.size} models in 'data' field")
+                            return modelIds
+                        }
                     }
 
-                    // Try alternative format with 'models' field
-                    if (modelsResponse.models.isNotEmpty()) {
-                        logger.info("Found ${modelsResponse.models.size} models in 'models' field")
-                        return modelsResponse.models
+                    // Try 'models' field - support both array of strings (legacy) and array of objects (new)
+                    val modelsField = jsonElement["models"]?.jsonArray
+                    if (modelsField != null && modelsField.isNotEmpty()) {
+                        val modelNames = modelsField.mapNotNull { element ->
+                            when {
+                                // New format: array of objects with 'name' field
+                                element is JsonObject -> element["name"]?.jsonPrimitive?.content
+                                // Legacy format: array of strings
+                                element is JsonPrimitive -> element.contentOrNull
+                                else -> null
+                            }
+                        }
+                        if (modelNames.isNotEmpty()) {
+                            logger.info("Found ${modelNames.size} models in 'models' field")
+                            return modelNames
+                        }
                     }
 
                     logger.warn("No models found in response")
