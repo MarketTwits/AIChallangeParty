@@ -1,4 +1,5 @@
 // Local Coach - JavaScript for Local LLM Chat
+const PROMPT_VERSION = 'coach_v2';
 let sessionId = generateSessionId();
 let messageCount = 0;
 let isLoading = false;
@@ -16,6 +17,39 @@ const messageCountEl = document.getElementById('message-count');
 const statusText = document.getElementById('status-text');
 const statusIndicator = document.getElementById('status-indicator');
 const modelSelect = document.getElementById('model-select');
+const temperatureInput = document.getElementById('temperature');
+const temperatureValue = document.getElementById('temperature-value');
+const topPInput = document.getElementById('top-p');
+const topPValue = document.getElementById('top-p-value');
+const maxTokensInput = document.getElementById('max-tokens');
+const contextMessagesInput = document.getElementById('context-messages');
+const frequencyPenaltyInput = document.getElementById('frequency-penalty');
+const frequencyPenaltyValue = document.getElementById('frequency-penalty-value');
+const settingsSummary = document.getElementById('settings-summary');
+const promptVersionLabel = document.getElementById('prompt-version');
+
+function getNumberValue(element, fallback) {
+    if (!element) return fallback;
+    const value = parseFloat(element.value);
+    return Number.isFinite(value) ? value : fallback;
+}
+
+function updateSettingsSummary(data) {
+    if (!settingsSummary) return;
+
+    const modelName = data?.model || selectedModel || availableModels[0] || '—';
+    const temp = data?.temperature ?? getNumberValue(temperatureInput, 0.35);
+    const topP = data?.topP ?? getNumberValue(topPInput, 0.9);
+    const maxTokens = data?.maxTokens ?? Math.round(getNumberValue(maxTokensInput, 700));
+    const context = data?.contextMessages ?? Math.round(getNumberValue(contextMessagesInput, 8));
+    const penalty = data?.frequencyPenalty ?? getNumberValue(frequencyPenaltyInput, 0.2);
+
+    settingsSummary.textContent = `Модель: ${modelName} · T=${temp} · top_p=${topP} · max_tokens=${maxTokens} · контекст=${context} пар · penalty=${penalty}`;
+
+    if (promptVersionLabel) {
+        promptVersionLabel.textContent = `prompt: ${data?.promptVersion || PROMPT_VERSION}`;
+    }
+}
 
 // Generate unique session ID
 function generateSessionId() {
@@ -45,6 +79,7 @@ async function loadModels() {
             modelSelect.value = selectedModel;
 
             console.log(`Loaded ${data.models.length} models, selected: ${selectedModel}`);
+            updateSettingsSummary({ model: selectedModel });
         } else {
             modelSelect.innerHTML = '<option value="">Нет доступных моделей</option>';
             displayMessage('assistant', '⚠️ Модели не найдены. Убедитесь, что LM Studio запущен и модель загружена.');
@@ -153,17 +188,29 @@ async function sendMessage(message) {
     setLoading(true);
 
     try {
+        const temperature = getNumberValue(temperatureInput, 0.35);
+        const topP = getNumberValue(topPInput, 0.9);
+        const maxTokens = Math.round(getNumberValue(maxTokensInput, 700));
+        const contextMessages = Math.round(getNumberValue(contextMessagesInput, 8));
+        const frequencyPenalty = getNumberValue(frequencyPenaltyInput, 0.2);
+
+        const payload = {
+            sessionId: sessionId,
+            message: message,
+            temperature: temperature,
+            model: currentModel,
+            maxTokens: maxTokens,
+            topP: topP,
+            frequencyPenalty: frequencyPenalty,
+            contextMessages: contextMessages
+        };
+
         const response = await fetch('/local-coach/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                sessionId: sessionId,
-                message: message,
-                temperature: 0.7,
-                model: currentModel
-            })
+            body: JSON.stringify(payload)
         });
 
         if (!response.ok) {
@@ -178,6 +225,7 @@ async function sendMessage(message) {
         // Update message count
         messageCount = data.messageCount;
         messageCountEl.textContent = messageCount;
+        updateSettingsSummary(data);
 
     } catch (error) {
         console.error('Error sending message:', error);
@@ -238,10 +286,43 @@ clearButton.addEventListener('click', clearChat);
 modelSelect.addEventListener('change', (e) => {
     selectedModel = e.target.value;
     console.log('Model changed to:', selectedModel);
+    updateSettingsSummary({ model: selectedModel });
 });
+
+if (temperatureInput) {
+    temperatureInput.addEventListener('input', () => {
+        temperatureValue.textContent = temperatureInput.value;
+        updateSettingsSummary();
+    });
+}
+
+if (topPInput) {
+    topPInput.addEventListener('input', () => {
+        topPValue.textContent = topPInput.value;
+        updateSettingsSummary();
+    });
+}
+
+if (maxTokensInput) {
+    maxTokensInput.addEventListener('input', () => updateSettingsSummary());
+}
+
+if (contextMessagesInput) {
+    contextMessagesInput.addEventListener('input', () => updateSettingsSummary());
+}
+
+if (frequencyPenaltyInput) {
+    frequencyPenaltyInput.addEventListener('input', () => {
+        frequencyPenaltyValue.textContent = frequencyPenaltyInput.value;
+        updateSettingsSummary();
+    });
+}
 
 // Auto-focus input
 userInput.focus();
+
+// Initial summary and prompt version
+updateSettingsSummary();
 
 // Check status on load
 checkStatus();
