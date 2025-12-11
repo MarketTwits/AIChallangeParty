@@ -1465,7 +1465,12 @@ fun Application.configureRouting(
                         sessionId = request.sessionId,
                         userMessage = request.message,
                         temperature = request.temperature,
-                        modelName = request.model
+                        modelName = request.model,
+                        maxTokens = request.maxTokens,
+                        topP = request.topP,
+                        presencePenalty = request.presencePenalty,
+                        frequencyPenalty = request.frequencyPenalty,
+                        contextMessages = request.contextMessages
                     )
 
                     call.respond(HttpStatusCode.OK, response)

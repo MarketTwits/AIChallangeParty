@@ -261,6 +261,10 @@
                                     <span>Быстрые ответы на вашем железе</span>
                                 </li>
                             </ul>
+                            <p class="mt-3 text-sm text-gray-700">
+                                Для точных ответов подберите модель и параметры генерации ниже: температура, top_p, max
+                                tokens и размер контекста.
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -295,6 +299,87 @@
                     >
                         <option value="">Загрузка моделей...</option>
                     </select>
+                </div>
+
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 shadow-sm mb-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <p class="text-sm font-semibold text-gray-800">Параметры генерации</p>
+                        <span class="text-xs font-mono text-gray-500" id="prompt-version">prompt: coach_v2</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Температура <span class="text-xs text-gray-500" id="temperature-value">0.35</span>
+                            </label>
+                            <input
+                                    class="w-full accent-green-500"
+                                    id="temperature"
+                                    max="1"
+                                    min="0"
+                                    step="0.05"
+                                    type="range"
+                                    value="0.35"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Top P <span class="text-xs text-gray-500" id="top-p-value">0.9</span>
+                            </label>
+                            <input
+                                    class="w-full accent-green-500"
+                                    id="top-p"
+                                    max="1"
+                                    min="0"
+                                    step="0.05"
+                                    type="range"
+                                    value="0.9"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Max tokens
+                            </label>
+                            <input
+                                    class="w-full px-4 py-3 rounded-xl font-medium"
+                                    id="max-tokens"
+                                    max="4096"
+                                    min="64"
+                                    type="number"
+                                    value="700"
+                            />
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Контекст (пар сообщений)
+                            </label>
+                            <input
+                                    class="w-full px-4 py-3 rounded-xl font-medium"
+                                    id="context-messages"
+                                    max="24"
+                                    min="2"
+                                    type="number"
+                                    value="8"
+                            />
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">
+                                Штраф за повторы <span class="text-xs text-gray-500"
+                                                       id="frequency-penalty-value">0.2</span>
+                            </label>
+                            <input
+                                    class="w-full accent-green-500"
+                                    id="frequency-penalty"
+                                    max="2"
+                                    min="-2"
+                                    step="0.1"
+                                    type="range"
+                                    value="0.2"
+                            />
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-3" id="settings-summary">
+                        Настройте температуру и max tokens, чтобы балансировать точность и креативность ответов.
+                    </p>
                 </div>
 
                 <div class="flex space-x-3">
