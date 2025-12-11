@@ -9,6 +9,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -20,6 +21,9 @@ data class LMStudioChatRequest(
     val messages: List<LMStudioMessage>,
     val temperature: Double = 0.7,
     @SerialName("max_tokens") val maxTokens: Int = 1000,
+    @SerialName("top_p") val topP: Double? = null,
+    @SerialName("presence_penalty") val presencePenalty: Double? = null,
+    @SerialName("frequency_penalty") val frequencyPenalty: Double? = null,
 )
 
 @Serializable
@@ -57,6 +61,13 @@ data class LMStudioUsage(
     @SerialName("total_tokens") val totalTokens: Int? = null,
 )
 
+data class LMStudioChatResult(
+    val reply: String,
+    val modelUsed: String,
+    val usage: LMStudioUsage? = null,
+    val error: String? = null,
+)
+
 @Serializable
 data class LMStudioModelInfo(
     val name: String,
@@ -86,10 +97,12 @@ class LMStudioClient(private val baseUrl: String) {
         logger.info("LMStudioClient initialized with baseUrl: $baseUrl")
     }
 
+    @OptIn(ExperimentalSerializationApi::class)
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
         prettyPrint = false
+        explicitNulls = false
     }
 
     private val client = HttpClient(CIO) {
@@ -163,7 +176,15 @@ class LMStudioClient(private val baseUrl: String) {
         }
     }
 
-    suspend fun chat(messages: List<LMStudioMessage>, temperature: Double = 0.7, modelName: String? = null): String {
+    suspend fun chat(
+        messages: List<LMStudioMessage>,
+        temperature: Double = 0.7,
+        modelName: String? = null,
+        maxTokens: Int? = null,
+        topP: Double? = null,
+        presencePenalty: Double? = null,
+        frequencyPenalty: Double? = null,
+    ): LMStudioChatResult {
         return try {
             // Use provided model or get first available
             val selectedModel = modelName ?: run {
@@ -172,13 +193,19 @@ class LMStudioClient(private val baseUrl: String) {
             }
 
             val url = "$baseUrl/v1/chat/completions"
-            logger.info("Using model: $selectedModel for chat at $url")
+            logger.info(
+                "Using model: $selectedModel for chat at $url (temp=$temperature, maxTokens=${maxTokens ?: DEFAULT_MAX_TOKENS}," +
+                        " topP=${topP ?: "default"}, presence=${presencePenalty ?: "default"}, frequency=${frequencyPenalty ?: "default"})"
+            )
 
             val request = LMStudioChatRequest(
                 model = selectedModel,
                 messages = messages,
                 temperature = temperature,
-                maxTokens = 2000
+                maxTokens = maxTokens ?: DEFAULT_MAX_TOKENS,
+                topP = topP,
+                presencePenalty = presencePenalty,
+                frequencyPenalty = frequencyPenalty
             )
 
             val response: HttpResponse = client.post(url) {
@@ -192,7 +219,12 @@ class LMStudioClient(private val baseUrl: String) {
                 // Check for error in response
                 if (chatResponse.error != null) {
                     logger.error("LM Studio returned error: ${chatResponse.error.message}")
-                    return "Error: ${chatResponse.error.message}"
+                    return LMStudioChatResult(
+                        reply = "Error: ${chatResponse.error.message}",
+                        modelUsed = selectedModel,
+                        usage = chatResponse.usage,
+                        error = chatResponse.error.message
+                    )
                 }
 
                 val reply = chatResponse.choices.firstOrNull()?.message?.content
@@ -201,16 +233,29 @@ class LMStudioClient(private val baseUrl: String) {
                         "No response from model (empty choices)"
                     }
 
+                val modelUsed = chatResponse.model ?: selectedModel
                 logger.info("LM Studio response received. Tokens: ${chatResponse.usage?.totalTokens ?: "unknown"}")
-                reply
+                LMStudioChatResult(
+                    reply = reply,
+                    modelUsed = modelUsed,
+                    usage = chatResponse.usage
+                )
             } else {
                 val errorBody = response.bodyAsText()
                 logger.error("Failed to get chat response: ${response.status}, body: $errorBody")
-                "Error: Failed to get response from local model (${response.status}): $errorBody"
+                LMStudioChatResult(
+                    reply = "Error: Failed to get response from local model (${response.status}): $errorBody",
+                    modelUsed = selectedModel,
+                    error = "HTTP ${response.status}"
+                )
             }
         } catch (e: Exception) {
             logger.error("Error communicating with LM Studio", e)
-            "Error: ${e.message ?: "Failed to communicate with local model"}"
+            LMStudioChatResult(
+                reply = "Error: ${e.message ?: "Failed to communicate with local model"}",
+                modelUsed = modelName ?: "local-model",
+                error = e.message
+            )
         }
     }
 
@@ -230,5 +275,9 @@ class LMStudioClient(private val baseUrl: String) {
 
     fun close() {
         client.close()
+    }
+
+    companion object {
+        private const val DEFAULT_MAX_TOKENS = 700
     }
 }
