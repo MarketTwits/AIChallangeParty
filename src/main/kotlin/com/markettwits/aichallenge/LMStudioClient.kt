@@ -110,9 +110,9 @@ class LMStudioClient(private val baseUrl: String) {
             json(json)
         }
         install(HttpTimeout) {
-            requestTimeoutMillis = 120_000 // 2 minutes for chat completions
+            requestTimeoutMillis = 300_000 // 5 minutes for chat completions
             connectTimeoutMillis = 30_000  // 30 seconds for connection
-            socketTimeoutMillis = 120_000  // 2 minutes for socket read
+            socketTimeoutMillis = 300_000  // 5 minutes for socket read
         }
     }
 
