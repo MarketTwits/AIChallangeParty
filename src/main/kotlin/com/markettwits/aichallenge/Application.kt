@@ -269,17 +269,18 @@ fun main() {
     println("✅ Team Assistant Agent initialized successfully")
     println("🌐 Team Assistant UI: http://localhost:$port/team-assistant.html")
 
-    // Initialize Local Coach Agent (Day 26)
+    // Initialize Local LLM clients (LM Studio)
+    var lmStudioClient: LMStudioClient? = null
     var localCoachAgent: LocalCoachAgent? = null
+    var stacktraceAnalysisService: StacktraceAnalysisService? = null
     if (localLlmUrl.isNotEmpty()) {
-        println("🤖 Initializing Local Coach Agent (Day 26)...")
+        println("🤖 Initializing Local LLM integrations (LM Studio)...")
         try {
-            val lmStudioClient = LMStudioClient(localLlmUrl)
+            val candidate = LMStudioClient(localLlmUrl)
 
-            // Test connection
             val isAvailable = runBlocking {
                 try {
-                    lmStudioClient.isAvailable()
+                    candidate.isAvailable()
                 } catch (e: Exception) {
                     println("⚠️  Failed to connect to LM Studio: ${e.message}")
                     false
@@ -287,22 +288,30 @@ fun main() {
             }
 
             if (isAvailable) {
-                localCoachAgent = LocalCoachAgent(lmStudioClient)
-                val models = runBlocking { lmStudioClient.listModels() }
-                println("✅ Local Coach Agent initialized successfully")
+                lmStudioClient = candidate
+                localCoachAgent = LocalCoachAgent(candidate)
+                stacktraceAnalysisService = StacktraceAnalysisService(
+                    lmStudioClient = candidate,
+                    repository = StacktraceTaskRepository()
+                )
+
+                val models = runBlocking { candidate.listModels() }
+                println("✅ Local LLM integrations are ready")
                 println("   📊 Available models: ${models.joinToString(", ")}")
                 println("🌐 Local Coach UI: http://localhost:$port/local-coach.html")
+                println("🌐 Stacktrace analyst: POST /local-stacktrace/tasks (LM Studio)")
             } else {
                 println("⚠️  LM Studio is not available at $localLlmUrl")
                 println("   💡 Make sure LM Studio is running and accessible")
+                candidate.close()
             }
         } catch (e: Exception) {
-            println("❌ Failed to initialize Local Coach Agent: ${e.message}")
+            println("❌ Failed to initialize Local LLM integrations: ${e.message}")
             e.printStackTrace()
         }
     } else {
-        println("⚠️  LOCAL_LLM_URL not configured - Local Coach Agent disabled")
-        println("   💡 Add LOCAL_LLM_URL to .env to enable local AI coach")
+        println("⚠️  LOCAL_LLM_URL not configured - Local LLM features disabled")
+        println("   💡 Add LOCAL_LLM_URL to .env to enable local AI coach and stacktrace analyst")
     }
 
     // Initialize What's New generator (Day 24)
@@ -339,7 +348,8 @@ fun main() {
             mcpIntegrationService,
             anthropicClient,
             localCoachAgent,
-            localLlmUrl
+            localLlmUrl,
+            stacktraceAnalysisService
         )
 
         // Configure MCP Orchestration routes (Day 14)

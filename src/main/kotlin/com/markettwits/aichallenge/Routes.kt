@@ -56,6 +56,7 @@ fun Application.configureRouting(
     anthropicClient: AnthropicClient,
     localCoachAgent: LocalCoachAgent? = null,
     localLlmUrl: String = "",
+    stacktraceAnalysisService: StacktraceAnalysisService? = null,
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
@@ -1450,6 +1451,217 @@ fun Application.configureRouting(
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to e.message)
+                )
+            }
+        }
+
+        // Local Stacktrace Analyst (Day 29)
+        if (stacktraceAnalysisService != null) {
+            post("/local-stacktrace/tasks") {
+                try {
+                    val request = call.receive<StacktraceTaskCreateRequest>()
+                    val task = stacktraceAnalysisService.submitTask(request)
+
+                    call.respond(
+                        HttpStatusCode.Accepted,
+                        StacktraceTaskCreateResponse(task)
+                    )
+                } catch (e: IllegalArgumentException) {
+                    logger.warn("Invalid stacktrace task request: ${e.message}")
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to (e.message ?: "Invalid request"))
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error creating stacktrace task", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to (e.message ?: "Failed to queue task"))
+                    )
+                }
+            }
+
+            get("/local-stacktrace/tasks") {
+                try {
+                    val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 200) ?: 50
+                    val tasks = stacktraceAnalysisService.listTasks(limit)
+
+                    call.respond(
+                        HttpStatusCode.OK,
+                        StacktraceTasksListResponse(
+                            tasks = tasks,
+                            count = tasks.size
+                        )
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error listing stacktrace tasks", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to e.message)
+                    )
+                }
+            }
+
+            get("/local-stacktrace/tasks/{id}") {
+                try {
+                    val id = call.parameters["id"]
+                    if (id.isNullOrBlank()) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Task id is required")
+                        )
+                        return@get
+                    }
+
+                    val task = stacktraceAnalysisService.getTask(id)
+                    if (task == null) {
+                        call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "Task not found")
+                        )
+                        return@get
+                    }
+
+                    call.respond(HttpStatusCode.OK, task)
+                } catch (e: Exception) {
+                    logger.error("Error fetching stacktrace task", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to e.message)
+                    )
+                }
+            }
+
+            post("/local-stacktrace/tasks/{id}/retry") {
+                try {
+                    val id = call.parameters["id"]
+                    if (id.isNullOrBlank()) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Task id is required")
+                        )
+                        return@post
+                    }
+
+                    val update = try {
+                        call.receive<StacktraceTaskUpdateRequest>()
+                    } catch (_: Exception) {
+                        null
+                    }
+
+                    val task = stacktraceAnalysisService.retryTask(id, update)
+                    call.respond(HttpStatusCode.Accepted, task)
+                } catch (e: IllegalArgumentException) {
+                    logger.warn("Invalid retry request: ${e.message}")
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to (e.message ?: "Invalid request"))
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error retrying stacktrace task", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to e.message)
+                    )
+                }
+            }
+
+            get("/local-stacktrace/tasks/{id}/report") {
+                try {
+                    val id = call.parameters["id"]
+                    if (id.isNullOrBlank()) {
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Task id is required")
+                        )
+                        return@get
+                    }
+
+                    val task = stacktraceAnalysisService.getTask(id)
+                    if (task == null) {
+                        call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "Task not found")
+                        )
+                        return@get
+                    }
+
+                    if (task.report.isNullOrBlank()) {
+                        call.respond(
+                            HttpStatusCode.NotFound,
+                            mapOf("error" to "Report not ready")
+                        )
+                        return@get
+                    }
+
+                    val asDownload = call.request.queryParameters["download"]?.toBoolean() ?: false
+                    if (asDownload) {
+                        call.response.headers.append(
+                            HttpHeaders.ContentDisposition,
+                            ContentDisposition.Attachment.withParameter(
+                                ContentDisposition.Parameters.FileName,
+                                "stacktrace-report-$id.md"
+                            ).toString()
+                        )
+                    }
+                    call.respondText(
+                        text = task.report,
+                        contentType = ContentType.parse("text/markdown")
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error downloading stacktrace report", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to e.message)
+                    )
+                }
+            }
+
+            get("/local-stacktrace/status") {
+                val tasks = stacktraceAnalysisService.listTasks(limit = 10)
+                val active =
+                    tasks.count { it.status == StacktraceTaskStatus.RUNNING || it.status == StacktraceTaskStatus.QUEUED }
+
+                call.respond(
+                    HttpStatusCode.OK,
+                    StacktraceStatusResponse(
+                        available = true,
+                        recentTasks = tasks,
+                        activeCount = active
+                    )
+                )
+            }
+
+            get("/local-stacktrace/models") {
+                try {
+                    val models = stacktraceAnalysisService.listModels()
+                    call.respond(
+                        HttpStatusCode.OK,
+                        LocalModelsResponse(
+                            models = models,
+                            count = models.size
+                        )
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error fetching LM Studio models", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        LocalModelsResponse(
+                            models = emptyList(),
+                            count = 0,
+                            error = e.message
+                        )
+                    )
+                }
+            }
+        } else {
+            get("/local-stacktrace/status") {
+                call.respond(
+                    HttpStatusCode.OK,
+                    StacktraceStatusResponse(
+                        available = false,
+                        message = "LOCAL_LLM_URL not configured or LM Studio unavailable"
+                    )
                 )
             }
         }

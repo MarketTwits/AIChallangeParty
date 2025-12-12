@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Stacktrace Analyst · LM Studio</title>
+    <link href="assets/favicon.png" rel="icon" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+          rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2F3F6E;
+            --primary-light: #5470B0;
+            --accent: #FF6B35;
+            --muted: #4B5563;
+            --surface: #FFFFFF;
+            --bg-soft: #F8F9FF;
+            --firebase-amber: #FFCB2B;
+        }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f7fb; }
+        .card { background: var(--surface); border: 1px solid #E5E7EB; border-radius: 16px; box-shadow: 0 10px 30px rgba(47, 63, 110, 0.08); }
+        .pill { border-radius: 999px; padding: 6px 10px; font-weight: 700; font-size: 12px; }
+        .pill.QUEUED { background: rgba(255, 203, 43, 0.15); color: #D97706; }
+        .pill.RUNNING { background: rgba(84, 112, 176, 0.18); color: var(--primary); }
+        .pill.COMPLETED { background: rgba(34, 197, 94, 0.15); color: #15803D; }
+        .pill.FAILED { background: rgba(248, 113, 113, 0.16); color: #DC2626; }
+        .mono { font-family: "JetBrains Mono", "SF Mono", Menlo, monospace; }
+        .progress-bar { height: 8px; border-radius: 999px; background: #E5E7EB; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%); }
+        .report-content h1, .report-content h2, .report-content h3 { font-weight: 700; margin-top: 16px; margin-bottom: 8px; }
+        .report-content ul { list-style: disc; padding-left: 20px; margin: 8px 0; }
+        .report-content ol { list-style: decimal; padding-left: 20px; margin: 8px 0; }
+        .report-content code, .report-content pre { background: #0B1220; color: #E5E7EB; border-radius: 10px; padding: 10px; display: block; overflow-x: auto; }
+        .report-content p { margin: 8px 0; }
+    </style>
+</head>
+<body class="min-h-screen">
+<header class="bg-[var(--primary)] text-white">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-[var(--firebase-amber)] flex items-center justify-center shadow-md">
+                <span class="text-[var(--primary)] font-extrabold">F</span>
+            </div>
+            <div>
+                <div class="text-lg font-bold">Firebase-like Stacktrace Analyst</div>
+                <div class="text-sm text-[#E2E8F0]">Локально на LM Studio · цвета вашей дизайн-системы</div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="text-sm opacity-75">LM Studio</span>
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/15 text-white border border-white/20">Local</span>
+        </div>
+    </div>
+</header>
+
+<section class="bg-[var(--bg-soft)] border-b border-[#E5E7EB]">
+    <div class="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(255,203,43,0.15)] text-[#92400E] text-xs font-semibold uppercase tracking-wide">
+                Firebase vibe
+            </div>
+            <h1 class="text-3xl md:text-4xl font-extrabold text-[var(--primary)] mt-2">Аналитика крэшей Android</h1>
+            <p class="text-[var(--muted)] max-w-2xl mt-2">Кидайте stacktrace из Firebase Crashlytics в очередь — модель
+                разбирает причины, предлагает фиксы и сохраняет отчёт в markdown.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 px-4 py-2 rounded-xl bg-white shadow border border-[#E5E7EB]">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span class="text-sm font-semibold text-[var(--primary)]">Локальный режим</span>
+            </div>
+        </div>
+    </div>
+</section>
+
+<main class="max-w-7xl mx-auto px-4 py-8 flex flex-col gap-6">
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div class="card xl:col-span-1 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-bold text-[var(--primary)]">Новая задача</h2>
+                <span class="text-xs font-semibold px-2.5 py-1 rounded-full bg-[rgba(84,112,176,0.12)] text-[var(--primary)]">LM Studio</span>
+            </div>
+            <form class="space-y-4" id="taskForm">
+                <div>
+                    <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Название</label>
+                    <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="title" placeholder="Например: NPE в SignupActivity"
+                           type="text">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Загрузить .txt / .log</label>
+                    <div class="border border-dashed border-[#CBD5E1] rounded-lg p-3 bg-[rgba(255,203,43,0.06)]">
+                        <input accept=".txt,.log" class="w-full text-sm text-[var(--muted)]" id="fileInput" type="file">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Или вставьте стектрейс</label>
+                    <textarea class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none mono text-sm" id="stacktraceText" placeholder="Caused by: java.lang.NullPointerException..."
+                              rows="8"></textarea>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Модель</label>
+                        <div class="relative">
+                            <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="model" list="modelOptions" placeholder="hermes-2-pro"
+                                   type="text">
+                            <datalist id="modelOptions"></datalist>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Temperature</label>
+                        <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="temperature" max="2" min="0" placeholder="0.2" step="0.05"
+                               type="number">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">Max tokens</label>
+                        <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="maxTokens" max="40000" min="128" placeholder="40000"
+                               type="number">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">top_p</label>
+                        <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="topP" max="1" min="0" placeholder="1.0" step="0.01"
+                               type="number">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">presence_penalty</label>
+                        <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="presencePenalty" max="2" min="-2" step="0.1"
+                               type="number">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-[var(--primary)] mb-1">frequency_penalty</label>
+                        <input class="w-full rounded-lg border border-[#E5E7EB] px-3 py-2 focus:ring-2 focus:ring-[var(--primary)] focus:outline-none" id="frequencyPenalty" max="2" min="-2" step="0.1"
+                               type="number">
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-3 pt-2">
+                    <button class="flex-1 inline-flex items-center justify-center gap-2 bg-[var(--primary)] hover:bg-[var(--primary-light)] text-white font-semibold px-4 py-2 rounded-lg shadow transition"
+                            type="submit">
+                        <span>Отправить</span>
+                    </button>
+                    <button class="px-4 py-2 rounded-lg border border-[#E5E7EB] text-[var(--primary)] font-semibold bg-white hover:bg-[var(--bg-soft)]" id="refreshBtn"
+                            type="button">
+                        Обновить
+                    </button>
+                </div>
+                <div class="text-sm text-[var(--muted)]" id="statusBox"></div>
+            </form>
+        </div>
+
+        <div class="card xl:col-span-2 p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h2 class="text-xl font-bold text-[var(--primary)]">Задачи</h2>
+                    <p class="text-sm text-[var(--muted)]">История сохраняется в базе, можно открыть после
+                        перезапуска.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button class="hidden px-3 py-2 rounded-lg bg-[rgba(84,112,176,0.12)] text-[var(--primary)] text-sm font-semibold"
+                            id="pollSelected">
+                        Обновить выбранную
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full">
+                    <thead>
+                    <tr class="text-left text-xs uppercase tracking-wide text-[var(--muted)] border-b">
+                        <th class="py-2">ID</th>
+                        <th class="py-2">Статус</th>
+                        <th class="py-2">Прогресс</th>
+                        <th class="py-2">Создано</th>
+                        <th class="py-2">Тайтл</th>
+                        <th class="py-2"></th>
+                    </tr>
+                    </thead>
+                    <tbody class="text-sm" id="tasksBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="card p-6">
+        <div class="flex items-center justify-between mb-3">
+            <div>
+                <h2 class="text-xl font-bold text-[var(--primary)]">Отчёт</h2>
+                <p class="text-sm text-[var(--muted)]" id="reportMeta">Выберите задачу, чтобы увидеть
+                    markdown-отчёт.</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <a class="hidden px-4 py-2 rounded-lg bg-[var(--accent)] text-white font-semibold shadow hover:opacity-90" download
+                   href="#"
+                   id="downloadBtn">Скачать .md</a>
+                <div class="hidden flex items-center gap-2 px-3 py-1 rounded-full bg-[rgba(84,112,176,0.12)] text-[var(--primary)] text-xs font-semibold"
+                     id="progressBadge">
+                    <span class="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse"></span>
+                    <span id="progressText">В работе</span>
+                </div>
+            </div>
+        </div>
+        <div class="progress-bar mb-4">
+            <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+        <div class="report-content text-[var(--primary)] bg-[#F8FAFC] border border-[#E5E7EB] rounded-xl p-4 text-sm leading-relaxed"
+             id="reportBox">
+            –
+        </div>
+    </div>
+</main>
+
+<script>
+    const statusBox = document.getElementById('statusBox');
+    const tasksBody = document.getElementById('tasksBody');
+    const reportBox = document.getElementById('reportBox');
+    const reportMeta = document.getElementById('reportMeta');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const progressFill = document.getElementById('progressFill');
+    const progressBadge = document.getElementById('progressBadge');
+    const progressText = document.getElementById('progressText');
+    const form = document.getElementById('taskForm');
+    const refreshBtn = document.getElementById('refreshBtn');
+    const fileInput = document.getElementById('fileInput');
+    const stacktraceText = document.getElementById('stacktraceText');
+    const pollSelected = document.getElementById('pollSelected');
+    const modelOptions = document.getElementById('modelOptions');
+    let pollTimer = null;
+    let lastTaskId = null;
+
+    function setStatus(message, type = 'info') {
+        statusBox.textContent = message;
+        statusBox.className = type === 'error'
+            ? 'text-sm text-red-600'
+            : 'text-sm text-[var(--muted)]';
+    }
+
+    async function fileToText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsText(file);
+        });
+    }
+
+    function retryTask(taskId) {
+        fetch(`/local-stacktrace/tasks/${taskId}/retry`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                model: document.getElementById('model').value || null,
+                temperature: parseFloat(document.getElementById('temperature').value) || null,
+                maxTokens: parseInt(document.getElementById('maxTokens').value) || null,
+                topP: parseFloat(document.getElementById('topP').value) || null,
+                presencePenalty: parseFloat(document.getElementById('presencePenalty').value) || null,
+                frequencyPenalty: parseFloat(document.getElementById('frequencyPenalty').value) || null,
+            }),
+        }).then(async res => {
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || 'Не удалось перезапустить задачу');
+            }
+            const task = await res.json();
+            lastTaskId = task.id;
+            setStatus(`Перезапуск задачи ${task.id}...`);
+            loadTasks();
+            pollTask(task.id, true);
+            schedulePoll(task.id);
+        }).catch(err => setStatus(err.message, 'error'));
+    }
+
+    function renderTasks(tasks) {
+        tasksBody.innerHTML = '';
+        if (!tasks || tasks.length === 0) {
+            tasksBody.innerHTML = '<tr><td colspan="6" class="py-4 text-[var(--muted)]">Нет задач</td></tr>';
+            return;
+        }
+
+        tasks.forEach(task => {
+            const tr = document.createElement('tr');
+            tr.className = 'border-b hover:bg-[#F8FAFC] transition';
+            tr.innerHTML = `
+                <td class="py-3 mono text-xs">${task.id.slice(0, 8)}…</td>
+                <td class="py-3"><span class="pill ${task.status}">${task.status}</span></td>
+                <td class="py-3">
+                    <div class="w-36 progress-bar">
+                        <div class="progress-fill" style="width:${task.progress || 0}%;"></div>
+                    </div>
+                </td>
+                <td class="py-3 text-[var(--muted)]">${task.createdAt || ''}</td>
+                <td class="py-3">${task.title || ''}</td>
+                <td class="py-3 text-right flex gap-2 justify-end">
+                    <button class="px-3 py-1 rounded-lg bg-[var(--primary)] text-white text-xs font-semibold hover:bg-[var(--primary-light)]">Открыть</button>
+                    ${task.status === 'FAILED' ? '<button class="px-3 py-1 rounded-lg bg-[var(--accent)] text-white text-xs font-semibold hover:opacity-90 retry-btn">Перезапустить</button>' : ''}
+                </td>
+            `;
+            tr.querySelector('button').addEventListener('click', () => {
+                lastTaskId = task.id;
+                pollSelected.classList.remove('hidden');
+                pollTask(task.id, true);
+            });
+            const retryBtn = tr.querySelector('.retry-btn');
+            if (retryBtn) {
+                retryBtn.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    retryTask(task.id);
+                });
+            }
+            tasksBody.appendChild(tr);
+        });
+    }
+
+    async function loadTasks() {
+        try {
+            const res = await fetch('/local-stacktrace/tasks');
+            if (!res.ok) throw new Error('Не удалось загрузить список');
+            const data = await res.json();
+            renderTasks(data.tasks || []);
+        } catch (e) {
+            setStatus(e.message, 'error');
+        }
+    }
+
+    async function loadModels() {
+        try {
+            const res = await fetch('/local-stacktrace/models');
+            if (!res.ok) return;
+            const data = await res.json();
+            modelOptions.innerHTML = '';
+            (data.models || []).forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                modelOptions.appendChild(opt);
+            });
+        } catch (_) {
+            // ignore
+        }
+    }
+
+    function schedulePoll(taskId) {
+        if (pollTimer) clearInterval(pollTimer);
+        pollTimer = setInterval(() => pollTask(taskId), 2500);
+    }
+
+    function updateProgressUI(task) {
+        const pct = task.progress || 0;
+        progressFill.style.width = `${pct}%`;
+        if (task.status === 'COMPLETED') {
+            progressBadge.classList.add('hidden');
+        } else {
+            progressBadge.classList.remove('hidden');
+            progressText.textContent = task.status === 'RUNNING' ? 'В работе' : 'В очереди';
+        }
+    }
+
+    function renderReport(task) {
+        if (!task) return;
+        const header = `Задача ${task.id} · ${task.status}${task.title ? ' · ' + task.title : ''}`;
+        reportMeta.textContent = header;
+        if (task.report) {
+            reportBox.innerHTML = marked.parse(task.report);
+            downloadBtn.classList.remove('hidden');
+            downloadBtn.href = `/local-stacktrace/tasks/${task.id}/report?download=true`;
+        } else if (task.error) {
+            reportBox.textContent = task.error;
+            downloadBtn.classList.add('hidden');
+        } else {
+            reportBox.textContent = 'Отчёт ещё не готов.';
+            downloadBtn.classList.add('hidden');
+        }
+        updateProgressUI(task);
+    }
+
+    async function pollTask(taskId, manual = false) {
+        try {
+            const res = await fetch(`/local-stacktrace/tasks/${taskId}`);
+            if (!res.ok) throw new Error('Не удалось получить задачу');
+            const task = await res.json();
+
+            renderReport(task);
+
+            if (task.status === 'COMPLETED' || task.status === 'FAILED') {
+                if (pollTimer) clearInterval(pollTimer);
+            } else if (!manual) {
+                schedulePoll(taskId);
+            }
+            await loadTasks();
+        } catch (e) {
+            setStatus(e.message, 'error');
+        }
+    }
+
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        setStatus('Отправляю задачу…');
+
+        try {
+            let content = stacktraceText.value.trim();
+            if (fileInput.files && fileInput.files[0]) {
+                content = await fileToText(fileInput.files[0]);
+            }
+            if (!content) {
+                throw new Error('Нужно загрузить файл или вставить стектрейс текстом.');
+            }
+
+            const payload = {
+                title: document.getElementById('title').value || null,
+                stacktraceText: content,
+                model: document.getElementById('model').value || null,
+                temperature: parseFloat(document.getElementById('temperature').value) || null,
+                maxTokens: parseInt(document.getElementById('maxTokens').value) || null,
+                topP: parseFloat(document.getElementById('topP').value) || null,
+                presencePenalty: parseFloat(document.getElementById('presencePenalty').value) || null,
+                frequencyPenalty: parseFloat(document.getElementById('frequencyPenalty').value) || null,
+            };
+
+            const res = await fetch('/local-stacktrace/tasks', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+
+            if (!res.ok) {
+                const error = await res.json().catch(() => ({}));
+                throw new Error(error.error || 'Ошибка при создании задачи');
+            }
+
+            const data = await res.json();
+            const taskId = data.task?.id;
+            lastTaskId = taskId;
+            setStatus(`Задача создана: ${taskId}. Обновляю статус…`);
+            await loadTasks();
+            pollTask(taskId, true);
+            schedulePoll(taskId);
+            form.reset();
+            stacktraceText.value = '';
+        } catch (err) {
+            setStatus(err.message, 'error');
+        }
+    });
+
+    refreshBtn.addEventListener('click', loadTasks);
+    pollSelected.addEventListener('click', () => {
+        if (lastTaskId) pollTask(lastTaskId, true);
+    });
+
+    window.addEventListener('beforeunload', () => {
+        if (pollTimer) clearInterval(pollTimer);
+    });
+
+    loadTasks();
+    loadModels();
+</script>
+</body>
+</html>
