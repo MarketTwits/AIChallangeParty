@@ -1,0 +1,32 @@
+{
+  "profile": {
+    "name": "Valery",
+    "role": "Software Engineer",
+    "occupation": "Backend Developer",
+    "interests": [
+      "Kotlin",
+      "AI",
+      "Architecture"
+    ],
+    "facts": [
+      "Работаю с Kotlin и Ktor",
+      "Люблю практические примеры",
+      "Предпочитаю краткие объяснения"
+    ]
+  },
+  "personality": {
+    "humor": true,
+    "emoji": true
+  },
+  "preferences": {
+    "outputStyle": "THEORY_FIRST",
+    "codeComments": false,
+    "explainBasics": false,
+    "askClarifications": false
+  },
+  "communication": {
+    "addressing": "undefined",
+    "greetings": false,
+    "signoffs": true
+  }
+}

@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>ПЕРСОНАЛЬНЫЙ AI АГЕНТ // СИСТЕМА 2077</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap"
+          rel="stylesheet">
+    <style>
+        :root {
+            --cyan: #00E5FF;
+            --magenta: #FF10F0;
+            --yellow: #FCEE09;
+            --orange: #FF6F00;
+            --purple: #B000FF;
+            --green: #39FF14;
+            --pink: #FF006E;
+            --blue: #00B8FF;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Share Tech Mono', monospace;
+            background: #0a0a0a;
+            color: var(--green);
+            overflow-x: hidden;
+        }
+
+        /* Cyberpunk Background */
+        .cyber-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(rgba(0, 229, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 16, 240, 0.02) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: -2;
+            animation: gridMove 20s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% {
+                transform: translate(0, 0);
+            }
+            100% {
+                transform: translate(50px, 50px);
+            }
+        }
+
+        .cyber-noise {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                    0deg,
+                    rgba(0, 0, 0, 0.15) 0px,
+                    rgba(0, 229, 255, 0.02) 1px,
+                    rgba(0, 0, 0, 0.15) 2px
+            );
+            pointer-events: none;
+            z-index: 100;
+            opacity: 0.4;
+            animation: scanlines 8s linear infinite;
+        }
+
+        @keyframes scanlines {
+            0% {
+                transform: translateY(0);
+            }
+            100% {
+                transform: translateY(50px);
+            }
+        }
+
+        /* Minimal Glow - No animations */
+        .neon-text {
+            font-family: 'Orbitron', sans-serif;
+            color: var(--cyan);
+        }
+
+        .neon-magenta {
+            color: var(--magenta);
+        }
+
+        .neon-green {
+            color: var(--green);
+        }
+
+        .neon-yellow {
+            color: var(--yellow);
+        }
+
+        .neon-orange {
+            color: var(--orange);
+        }
+
+        .neon-purple {
+            color: var(--purple);
+        }
+
+        /* Glitch Effects - Disabled */
+
+        /* Simple Borders - No glitch animations */
+        .border-glitch {
+            /* No animation */
+        }
+
+        /* Neon Borders - Minimal glow */
+        .neon-border {
+            border: 2px solid var(--cyan);
+        }
+
+        .neon-border-magenta {
+            border: 2px solid var(--magenta);
+        }
+
+        .neon-border-green {
+            border: 2px solid var(--green);
+        }
+
+        .neon-border-yellow {
+            border: 2px solid var(--yellow);
+        }
+
+        .neon-border-purple {
+            border: 2px solid var(--purple);
+        }
+
+        /* Buttons */
+        .cyber-btn {
+            position: relative;
+            background: rgba(0, 229, 255, 0.05);
+            border: 2px solid var(--cyan);
+            color: var(--cyan);
+            padding: 12px 24px;
+            text-transform: uppercase;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+        }
+
+        .cyber-btn:hover {
+            background: rgba(0, 229, 255, 0.15);
+            transform: translateY(-2px);
+        }
+
+        .cyber-btn-magenta {
+            background: rgba(255, 16, 240, 0.05);
+            border-color: var(--magenta);
+            color: var(--magenta);
+        }
+
+        .cyber-btn-magenta:hover {
+            background: rgba(255, 16, 240, 0.15);
+        }
+
+        .cyber-btn-green {
+            background: rgba(57, 255, 20, 0.05);
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        .cyber-btn-green:hover {
+            background: rgba(57, 255, 20, 0.15);
+        }
+
+        .cyber-btn-yellow {
+            background: rgba(252, 238, 9, 0.05);
+            border-color: var(--yellow);
+            color: var(--yellow);
+        }
+
+        .cyber-btn-yellow:hover {
+            background: rgba(252, 238, 9, 0.15);
+        }
+
+        .cyber-btn-purple {
+            background: rgba(176, 0, 255, 0.05);
+            border-color: var(--purple);
+            color: var(--purple);
+        }
+
+        .cyber-btn-purple:hover {
+            background: rgba(176, 0, 255, 0.15);
+        }
+
+        /* Input Fields */
+        .cyber-input {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid var(--cyan);
+            color: var(--cyan);
+            padding: 10px 15px;
+            font-family: 'Share Tech Mono', monospace;
+            transition: all 0.3s;
+        }
+
+        .cyber-input:focus {
+            outline: none;
+            border-color: var(--magenta);
+        }
+
+        /* Chat Messages */
+        .chat-message {
+            animation: slideIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateX(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .user-message {
+            background: linear-gradient(135deg, rgba(255, 16, 240, 0.15), rgba(176, 0, 255, 0.1));
+            border-left: 3px solid var(--magenta);
+        }
+
+        .assistant-message {
+            background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(57, 255, 20, 0.1));
+            border-left: 3px solid var(--cyan);
+        }
+
+        /* Loading Animation */
+        .loading-dots span {
+            animation: blink 1.4s infinite;
+            animation-fill-mode: both;
+        }
+
+        .loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes blink {
+            0%, 80%, 100% {
+                opacity: 0.3;
+            }
+            40% {
+                opacity: 1;
+            }
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            backdrop-filter: blur(10px);
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        /* Markdown Styles with colorful highlights */
+        .message-content h1, .message-content h2, .message-content h3 {
+            font-weight: bold;
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+        }
+
+        .message-content h1 {
+            font-size: 1.5em;
+            color: var(--cyan);
+        }
+
+        .message-content h2 {
+            font-size: 1.3em;
+            color: var(--magenta);
+        }
+
+        .message-content h3 {
+            font-size: 1.1em;
+            color: var(--yellow);
+        }
+
+        .message-content p {
+            margin-bottom: 0.5em;
+        }
+
+        .message-content ul, .message-content ol {
+            margin-left: 1.5em;
+            margin-bottom: 0.5em;
+        }
+
+        .message-content li {
+            margin-bottom: 0.25em;
+        }
+
+        .message-content code {
+            background: rgba(0, 229, 255, 0.1);
+            border: 1px solid var(--cyan);
+            padding: 0.2em 0.4em;
+            border-radius: 3px;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--green);
+        }
+
+        .message-content pre {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--purple);
+            padding: 1em;
+            border-radius: 5px;
+            overflow-x: auto;
+            margin: 0.5em 0;
+        }
+
+        .message-content pre code {
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+
+        .message-content blockquote {
+            border-left: 3px solid var(--magenta);
+            padding-left: 1em;
+            margin: 0.5em 0;
+            font-style: italic;
+            color: var(--magenta);
+        }
+
+        .message-content a {
+            color: var(--yellow);
+            text-decoration: underline;
+        }
+
+        /* Tabs */
+        .tab-btn {
+            background: rgba(0, 0, 0, 0.5);
+            border-bottom: 2px solid transparent;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            border-bottom-color: var(--cyan);
+            color: var(--cyan);
+        }
+
+        .tab-btn:hover {
+            color: var(--cyan);
+        }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, var(--cyan), var(--magenta), var(--purple));
+            border-radius: 5px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, var(--magenta), var(--purple), var(--cyan));
+        }
+
+        /* Corner Decoration with Animation */
+        .corner-deco {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--cyan);
+            animation: corner-pulse 2s infinite;
+        }
+
+        @keyframes corner-pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .corner-deco.top-left {
+            top: -2px;
+            left: -2px;
+            border-right: none;
+            border-bottom: none;
+        }
+
+        .corner-deco.top-right {
+            top: -2px;
+            right: -2px;
+            border-left: none;
+            border-bottom: none;
+        }
+
+        .corner-deco.bottom-left {
+            bottom: -2px;
+            left: -2px;
+            border-right: none;
+            border-top: none;
+        }
+
+        .corner-deco.bottom-right {
+            bottom: -2px;
+            right: -2px;
+            border-left: none;
+            border-top: none;
+        }
+
+        /* File input styling */
+        input[type="file"] {
+            display: none;
+        }
+
+    </style>
+</head>
+<body>
+<!-- Background Effects -->
+<div class="cyber-bg"></div>
+<div class="cyber-noise"></div>
+
+<div class="container mx-auto px-4 py-8 max-w-6xl relative">
+    <!-- Header -->
+    <div class="relative mb-6 p-6 neon-border border-glitch" style="background: rgba(0, 0, 0, 0.8);">
+        <div class="corner-deco top-left"></div>
+        <div class="corner-deco top-right"></div>
+        <div class="corner-deco bottom-left"></div>
+        <div class="corner-deco bottom-right"></div>
+
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold neon-text glitch mb-2" data-text="AI АГЕНТ // СИСТЕМА 2077">
+                    AI АГЕНТ // СИСТЕМА 2077
+                </h1>
+                <p class="text-sm neon-magenta" style="font-family: 'Orbitron', sans-serif;">
+                    &gt; ПЕРСОНАЛЬНЫЙ АССИСТЕНТ v1.0 // ONLINE
+                </p>
+            </div>
+            <button class="cyber-btn glitch-hover" onclick="openConfigModal()">
+                ⚙ НАСТРОЙКИ
+            </button>
+        </div>
+    </div>
+
+    <!-- Chat Panel -->
+    <div class="relative neon-border-green p-6"
+         style="height: calc(100vh - 250px); min-height: 500px; background: rgba(0, 0, 0, 0.9); display: flex; flex-direction: column;">
+        <div class="corner-deco top-left" style="border-color: var(--green);"></div>
+        <div class="corner-deco top-right" style="border-color: var(--green);"></div>
+        <div class="corner-deco bottom-left" style="border-color: var(--green);"></div>
+        <div class="corner-deco bottom-right" style="border-color: var(--green);"></div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h2 class="text-xl font-bold neon-green glitch-hover" style="font-family: 'Orbitron', sans-serif;">
+                &gt; ТЕРМИНАЛ СВЯЗИ
+            </h2>
+            <div class="flex space-x-2">
+                <button class="cyber-btn-purple glitch-hover" onclick="viewPrompt()"
+                        style="font-size: 12px; padding: 8px 16px;">
+                    👁 ПРОМПТ
+                </button>
+                <button class="cyber-btn-magenta glitch-hover" onclick="clearChat()"
+                        style="font-size: 12px; padding: 8px 16px;">
+                    🗑 ОЧИСТИТЬ
+                </button>
+            </div>
+        </div>
+
+        <!-- Chat Messages -->
+        <div class="flex-1 overflow-y-auto space-y-4 mb-4 pr-2" id="chat-container">
+            <div class="text-center text-gray-500 text-sm py-8">
+                <span class="neon-text">&gt; СИСТЕМА ГОТОВА К РАБОТЕ</span><br>
+                <span style="color: #666;">Начните общение с вашим персональным ассистентом...</span>
+            </div>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div class="hidden mb-4" id="loading-indicator">
+            <div class="flex items-center space-x-2 neon-text">
+                <div class="loading-dots flex space-x-1">
+                    <span class="w-2 h-2 rounded-full" style="background: var(--cyan);"></span>
+                    <span class="w-2 h-2 rounded-full" style="background: var(--magenta);"></span>
+                    <span class="w-2 h-2 rounded-full" style="background: var(--yellow);"></span>
+                </div>
+                <span>&gt; ОБРАБОТКА ЗАПРОСА...</span>
+            </div>
+        </div>
+
+        <!-- Chat Input -->
+        <div class="flex space-x-2">
+            <input class="flex-1 cyber-input" id="chat-input" onkeypress="handleKeyPress(event)" placeholder="> ВВЕДИТЕ СООБЩЕНИЕ..."
+                   type="text">
+            <button class="cyber-btn-green glitch-hover" onclick="sendMessage()">
+                ОТПРАВИТЬ
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Configuration Modal -->
+<div class="modal fixed inset-0 items-center justify-center p-4 z-50" id="config-modal"
+     style="background: rgba(0, 0, 0, 0.9);">
+    <div class="relative neon-border-magenta p-6 max-w-4xl w-full max-h-screen overflow-y-auto"
+         style="background: rgba(0, 0, 0, 0.95);">
+        <div class="corner-deco top-left" style="border-color: var(--magenta);"></div>
+        <div class="corner-deco top-right" style="border-color: var(--magenta);"></div>
+        <div class="corner-deco bottom-left" style="border-color: var(--magenta);"></div>
+        <div class="corner-deco bottom-right" style="border-color: var(--magenta);"></div>
+
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-2xl font-bold neon-magenta glitch-hover" style="font-family: 'Orbitron', sans-serif;">
+                &gt; КОНФИГУРАЦИЯ СИСТЕМЫ
+            </h3>
+            <button class="text-3xl neon-magenta hover:text-red-500" onclick="closeConfigModal()">×</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex space-x-2 mb-6 border-b border-gray-700 overflow-x-auto">
+            <button class="tab-btn active px-4 py-2 font-semibold" id="tab-profile" onclick="switchTab('profile')">
+                ПРОФИЛЬ
+            </button>
+            <button class="tab-btn px-4 py-2 font-semibold" id="tab-personality" onclick="switchTab('personality')">
+                ЛИЧНОСТЬ
+            </button>
+            <button class="tab-btn px-4 py-2 font-semibold" id="tab-preferences" onclick="switchTab('preferences')">
+                ПАРАМЕТРЫ
+            </button>
+            <button class="tab-btn px-4 py-2 font-semibold" id="tab-rules" onclick="switchTab('rules')">ПРАВИЛА</button>
+        </div>
+
+        <!-- Profile Tab -->
+        <div class="tab-content" id="content-profile">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ВАШЕ ИМЯ</label>
+                    <input class="w-full cyber-input" id="profile-name" placeholder="Наталья" type="text">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ПРОФЕССИЯ / РОЛЬ</label>
+                    <input class="w-full cyber-input" id="profile-role" placeholder="Инженер, Дизайнер, Менеджер..."
+                           type="text">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ДОЛЖНОСТЬ</label>
+                    <input class="w-full cyber-input" id="profile-occupation" placeholder="Ваша текущая должность"
+                           type="text">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ИНТЕРЕСЫ (ЧЕРЕЗ ЗАПЯТУЮ)</label>
+                    <input class="w-full cyber-input" id="profile-interests" placeholder="Технологии, Искусство, Наука..."
+                           type="text">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ФАКТЫ О ВАС (ПО ОДНОМУ НА СТРОКУ)</label>
+                    <textarea class="w-full cyber-input" id="profile-facts" placeholder="Люблю решать сложные задачи&#10;Работаю с современными технологиями&#10;Предпочитаю практический подход"
+                              rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Personality Tab -->
+        <div class="tab-content hidden" id="content-personality">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">МНОГОСЛОВНОСТЬ</label>
+                    <select class="w-full cyber-input" id="personality-verbosity">
+                        <option value="CONCISE">Краткие ответы</option>
+                        <option selected value="BALANCED">Сбалансированные</option>
+                        <option value="DETAILED">Подробные объяснения</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ТОН ОБЩЕНИЯ</label>
+                    <select class="w-full cyber-input" id="personality-tone">
+                        <option value="PROFESSIONAL">Профессиональный</option>
+                        <option selected value="FRIENDLY">Дружелюбный</option>
+                        <option value="CALM">Спокойный</option>
+                        <option value="ENTHUSIASTIC">Энтузиазм</option>
+                        <option value="CASUAL">Непринужденный</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ФОРМАЛЬНОСТЬ</label>
+                    <select class="w-full cyber-input" id="personality-formality">
+                        <option value="FORMAL">Формально - "Вы"</option>
+                        <option selected value="CASUAL">Неформально - "ты"</option>
+                    </select>
+                </div>
+                <div class="flex flex-col space-y-2">
+                    <label class="flex items-center space-x-2">
+                        <input class="w-5 h-5" id="personality-humor" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Использовать юмор</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input class="w-5 h-5" id="personality-emoji" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Использовать эмодзи</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preferences Tab -->
+        <div class="tab-content hidden" id="content-preferences">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">СТИЛЬ ОТВЕТОВ</label>
+                    <select class="w-full cyber-input" id="preferences-outputStyle">
+                        <option value="CODE_FIRST">Практика в приоритете</option>
+                        <option selected value="BALANCED">Сбалансированно</option>
+                        <option value="THEORY_FIRST">Теория в приоритете</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ЯЗЫК</label>
+                    <select class="w-full cyber-input" id="preferences-language">
+                        <option selected value="ru">Русский</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="de">Deutsch</option>
+                        <option value="fr">Français</option>
+                    </select>
+                </div>
+                <div class="space-y-2">
+                    <label class="flex items-center space-x-2">
+                        <input checked class="w-5 h-5" id="preferences-codeComments" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Давать пояснения к ответам</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input checked class="w-5 h-5" id="preferences-explainBasics" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Объяснять базовые концепции</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input checked class="w-5 h-5" id="preferences-askClarifications" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Задавать уточняющие вопросы</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rules Tab -->
+        <div class="tab-content hidden" id="content-rules">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">КАК К ВАМ ОБРАЩАТЬСЯ</label>
+                    <input class="w-full cyber-input" id="communication-addressing" placeholder="ты" type="text"
+                           value="ты">
+                </div>
+                <div class="flex flex-col space-y-2">
+                    <label class="flex items-center space-x-2">
+                        <input checked class="w-5 h-5" id="communication-greetings" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Использовать приветствия</span>
+                    </label>
+                    <label class="flex items-center space-x-2">
+                        <input class="w-5 h-5" id="communication-signoffs" style="accent-color: var(--cyan);"
+                               type="checkbox">
+                        <span class="neon-text">Использовать прощания</span>
+                    </label>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ПРАВИЛА (ПО ОДНОМУ НА СТРОКУ)</label>
+                    <textarea class="w-full cyber-input" id="config-rules" placeholder="Давай практические советы&#10;Будь кратким но информативным&#10;Фокусируйся на решении задач"
+                              rows="5"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2 neon-text">ДОПОЛНИТЕЛЬНЫЕ ИНСТРУКЦИИ</label>
+                    <textarea class="w-full cyber-input" id="config-customInstructions" placeholder="Любые дополнительные инструкции для агента..."
+                              rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 space-y-3">
+            <button class="w-full cyber-btn-green glitch-hover" onclick="saveConfig()">
+                💾 СОХРАНИТЬ КОНФИГУРАЦИЮ
+            </button>
+            <div class="grid grid-cols-3 gap-2">
+                <button class="cyber-btn glitch-hover" onclick="loadConfig()">
+                    🔄 ЗАГРУЗИТЬ
+                </button>
+                <button class="cyber-btn-yellow glitch-hover" onclick="exportConfig()">
+                    📥 ЭКСПОРТ
+                </button>
+                <label class="cyber-btn-purple glitch-hover text-center cursor-pointer">
+                    📂 ИМПОРТ
+                    <input accept=".json" id="import-file" onchange="importConfig(event)" type="file">
+                </label>
+            </div>
+        </div>
+
+        <!-- Status Message -->
+        <div class="mt-4 hidden p-4 rounded" id="status-message" style="border: 1px solid var(--green);"></div>
+    </div>
+</div>
+
+<!-- Prompt Modal -->
+<div class="modal fixed inset-0 items-center justify-center p-4 z-50" id="prompt-modal"
+     style="background: rgba(0, 0, 0, 0.9);">
+    <div class="relative neon-border-purple p-6 max-w-3xl w-full max-h-screen overflow-y-auto"
+         style="background: rgba(0, 0, 0, 0.95);">
+        <div class="corner-deco top-left" style="border-color: var(--purple);"></div>
+        <div class="corner-deco top-right" style="border-color: var(--purple);"></div>
+        <div class="corner-deco bottom-left" style="border-color: var(--purple);"></div>
+        <div class="corner-deco bottom-right" style="border-color: var(--purple);"></div>
+
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-2xl font-bold neon-purple glitch-hover" style="font-family: 'Orbitron', sans-serif;">
+                &gt; SYSTEM PROMPT
+            </h3>
+            <button class="text-2xl neon-purple hover:text-red-500" onclick="closePromptModal()">×</button>
+        </div>
+        <pre class="cyber-input p-4 text-sm whitespace-pre-wrap overflow-x-auto" id="prompt-content"
+             style="background: rgba(0, 0, 0, 0.8);"></pre>
+        <button class="mt-4 w-full cyber-btn-purple glitch-hover" onclick="closePromptModal()">
+            ЗАКРЫТЬ
+        </button>
+    </div>
+</div>
+
+<script>
+    let conversationId = null;
+
+    marked.setOptions({
+        breaks: true,
+        gfm: true
+    });
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        document.getElementById(`content-${tabName}`).classList.remove('hidden');
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+    }
+
+    function openConfigModal() {
+        document.getElementById('config-modal').classList.add('active');
+        loadConfig();
+    }
+
+    function closeConfigModal() {
+        document.getElementById('config-modal').classList.remove('active');
+    }
+
+    function closePromptModal() {
+        document.getElementById('prompt-modal').classList.remove('active');
+    }
+
+    async function loadConfig() {
+        try {
+            const response = await fetch('/personalized-agent/config');
+            const config = await response.json();
+
+            document.getElementById('profile-name').value = config.profile.name || '';
+            document.getElementById('profile-role').value = config.profile.role || '';
+            document.getElementById('profile-occupation').value = config.profile.occupation || '';
+            document.getElementById('profile-interests').value = config.profile.interests.join(', ') || '';
+            document.getElementById('profile-facts').value = config.profile.facts.join('\n') || '';
+
+            document.getElementById('personality-verbosity').value = config.personality.verbosity;
+            document.getElementById('personality-tone').value = config.personality.tone;
+            document.getElementById('personality-formality').value = config.personality.formality;
+            document.getElementById('personality-humor').checked = config.personality.humor;
+            document.getElementById('personality-emoji').checked = config.personality.emoji;
+
+            document.getElementById('preferences-outputStyle').value = config.preferences.outputStyle;
+            document.getElementById('preferences-language').value = config.preferences.language;
+            document.getElementById('preferences-codeComments').checked = config.preferences.codeComments;
+            document.getElementById('preferences-explainBasics').checked = config.preferences.explainBasics;
+            document.getElementById('preferences-askClarifications').checked = config.preferences.askClarifications;
+
+            document.getElementById('communication-addressing').value = config.communication.addressing || 'ты';
+            document.getElementById('communication-greetings').checked = config.communication.greetings;
+            document.getElementById('communication-signoffs').checked = config.communication.signoffs;
+            document.getElementById('config-rules').value = config.rules.join('\n') || '';
+            document.getElementById('config-customInstructions').value = config.customInstructions || '';
+
+            showStatus('&gt; КОНФИГУРАЦИЯ ЗАГРУЖЕНА', 'success');
+        } catch (error) {
+            showStatus('&gt; ОШИБКА ЗАГРУЗКИ: ' + error.message, 'error');
+        }
+    }
+
+    function buildConfig() {
+        const role = document.getElementById('profile-role').value.trim();
+        const occupation = document.getElementById('profile-occupation').value.trim();
+        const customInstructions = document.getElementById('config-customInstructions').value.trim();
+
+        // Получаем значения enum с дефолтами
+        const verbosity = document.getElementById('personality-verbosity').value || 'BALANCED';
+        const tone = document.getElementById('personality-tone').value || 'FRIENDLY';
+        const formality = document.getElementById('personality-formality').value || 'CASUAL';
+        const outputStyle = document.getElementById('preferences-outputStyle').value || 'BALANCED';
+        const language = document.getElementById('preferences-language').value || 'ru';
+        const addressing = document.getElementById('communication-addressing').value.trim() || 'ты';
+
+        // Парсим массивы с гарантией что это именно массивы
+        const interestsValue = document.getElementById('profile-interests').value.trim();
+        const interests = interestsValue ? interestsValue.split(',').map(s => s.trim()).filter(s => s) : [];
+
+        const factsValue = document.getElementById('profile-facts').value.trim();
+        const facts = factsValue ? factsValue.split('\n').map(s => s.trim()).filter(s => s) : [];
+
+        const rulesValue = document.getElementById('config-rules').value.trim();
+        const rules = rulesValue ? rulesValue.split('\n').map(s => s.trim()).filter(s => s) : [];
+
+        return {
+            version: "1.0",
+            profile: {
+                name: document.getElementById('profile-name').value || "User",
+                role: role || null,
+                occupation: occupation || null,
+                interests: interests,
+                facts: facts
+            },
+            personality: {
+                verbosity: verbosity,
+                tone: tone,
+                formality: formality,
+                humor: document.getElementById('personality-humor').checked,
+                emoji: document.getElementById('personality-emoji').checked
+            },
+            preferences: {
+                outputStyle: outputStyle,
+                language: language,
+                codeComments: document.getElementById('preferences-codeComments').checked,
+                explainBasics: document.getElementById('preferences-explainBasics').checked,
+                askClarifications: document.getElementById('preferences-askClarifications').checked
+            },
+            communication: {
+                addressing: addressing,
+                greetings: document.getElementById('communication-greetings').checked,
+                signoffs: document.getElementById('communication-signoffs').checked
+            },
+            rules: rules,
+            customInstructions: customInstructions || null
+        };
+    }
+
+    async function saveConfig() {
+        try {
+            const config = buildConfig();
+            console.log('Sending config:', config);
+            console.log('JSON stringified:', JSON.stringify(config, null, 2));
+
+            const response = await fetch('/personalized-agent/config', {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(config)
+            });
+
+            if (response.ok) {
+                showStatus('&gt; КОНФИГУРАЦИЯ СОХРАНЕНА', 'success');
+                conversationId = null;
+            } else {
+                const errorText = await response.text();
+                console.error('Server response:', errorText);
+                showStatus('&gt; ОШИБКА: ' + errorText, 'error');
+            }
+        } catch (error) {
+            console.error('Save error:', error);
+            showStatus('&gt; ОШИБКА СОХРАНЕНИЯ: ' + error.message, 'error');
+        }
+    }
+
+    function exportConfig() {
+        const config = buildConfig();
+        const dataStr = JSON.stringify(config, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+
+        const exportFileDefaultName = 'personal_agent_config.json';
+
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+
+        showStatus('&gt; КОНФИГУРАЦИЯ ЭКСПОРТИРОВАНА', 'success');
+    }
+
+    function importConfig(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+            try {
+                const config = JSON.parse(e.target.result);
+
+                // Fill form with imported data
+                document.getElementById('profile-name').value = config.profile.name || '';
+                document.getElementById('profile-role').value = config.profile.role || '';
+                document.getElementById('profile-occupation').value = config.profile.occupation || '';
+                document.getElementById('profile-interests').value = config.profile.interests.join(', ') || '';
+                document.getElementById('profile-facts').value = config.profile.facts.join('\n') || '';
+
+                document.getElementById('personality-verbosity').value = config.personality.verbosity;
+                document.getElementById('personality-tone').value = config.personality.tone;
+                document.getElementById('personality-formality').value = config.personality.formality;
+                document.getElementById('personality-humor').checked = config.personality.humor;
+                document.getElementById('personality-emoji').checked = config.personality.emoji;
+
+                document.getElementById('preferences-outputStyle').value = config.preferences.outputStyle;
+                document.getElementById('preferences-language').value = config.preferences.language;
+                document.getElementById('preferences-codeComments').checked = config.preferences.codeComments;
+                document.getElementById('preferences-explainBasics').checked = config.preferences.explainBasics;
+                document.getElementById('preferences-askClarifications').checked = config.preferences.askClarifications;
+
+                document.getElementById('communication-addressing').value = config.communication.addressing || 'ты';
+                document.getElementById('communication-greetings').checked = config.communication.greetings;
+                document.getElementById('communication-signoffs').checked = config.communication.signoffs;
+                document.getElementById('config-rules').value = config.rules.join('\n') || '';
+                document.getElementById('config-customInstructions').value = config.customInstructions || '';
+
+                showStatus('&gt; КОНФИГУРАЦИЯ ИМПОРТИРОВАНА', 'success');
+            } catch (error) {
+                showStatus('&gt; ОШИБКА ИМПОРТА: ' + error.message, 'error');
+            }
+        };
+        reader.readAsText(file);
+
+        // Reset file input
+        event.target.value = '';
+    }
+
+    async function viewPrompt() {
+        try {
+            const response = await fetch('/personalized-agent/prompt');
+            const data = await response.json();
+            document.getElementById('prompt-content').textContent = data.prompt;
+            document.getElementById('prompt-modal').classList.add('active');
+        } catch (error) {
+            showStatus('&gt; ОШИБКА ЗАГРУЗКИ ПРОМПТА: ' + error.message, 'error');
+        }
+    }
+
+    async function sendMessage() {
+        const input = document.getElementById('chat-input');
+        const message = input.value.trim();
+
+        if (!message) return;
+
+        addMessage('user', message);
+        input.value = '';
+
+        document.getElementById('loading-indicator').classList.remove('hidden');
+
+        try {
+            const response = await fetch('/personalized-agent/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    message: message,
+                    conversationId: conversationId
+                })
+            });
+
+            const data = await response.json();
+            conversationId = data.conversationId;
+            addMessage('assistant', data.response);
+        } catch (error) {
+            addMessage('system', '&gt; СИСТЕМНАЯ ОШИБКА: ' + error.message);
+        } finally {
+            document.getElementById('loading-indicator').classList.add('hidden');
+        }
+    }
+
+    function handleKeyPress(event) {
+        if (event.key === 'Enter') {
+            sendMessage();
+        }
+    }
+
+    function addMessage(role, content) {
+        const container = document.getElementById('chat-container');
+
+        if (container.children.length === 1 && container.children[0].textContent.includes('СИСТЕМА ГОТОВА')) {
+            container.innerHTML = '';
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat-message p-4 rounded ${
+            role === 'user' ? 'user-message ml-auto max-w-[80%]' :
+                role === 'assistant' ? 'assistant-message mr-auto max-w-[80%]' :
+                    'bg-red-900 text-center'
+        }`;
+
+        if (role === 'user') {
+            messageDiv.innerHTML = `<div class="font-semibold text-sm mb-1 neon-magenta" style="font-family: 'Orbitron', sans-serif;">&gt; ВЫ</div><div class="whitespace-pre-wrap neon-magenta">${escapeHtml(content)}</div>`;
+        } else if (role === 'assistant') {
+            const htmlContent = marked.parse(content);
+            messageDiv.innerHTML = `<div class="font-semibold text-sm mb-1 neon-text" style="font-family: 'Orbitron', sans-serif;">&gt; AI АГЕНТ</div><div class="message-content neon-text">${htmlContent}</div>`;
+        } else {
+            messageDiv.innerHTML = `<div style="color: #ff0000;">${escapeHtml(content)}</div>`;
+        }
+
+        container.appendChild(messageDiv);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    function clearChat() {
+        if (confirm('&gt; ОЧИСТИТЬ ТЕРМИНАЛ?')) {
+            const container = document.getElementById('chat-container');
+            container.innerHTML = '<div class="text-center text-gray-500 text-sm py-8"><span class="neon-text">&gt; СИСТЕМА ГОТОВА К РАБОТЕ</span><br><span style="color: #666;">Начните общение с вашим персональным ассистентом...</span></div>';
+            conversationId = null;
+        }
+    }
+
+    function showStatus(message, type) {
+        const statusEl = document.getElementById('status-message');
+        statusEl.textContent = message;
+        statusEl.style.background = type === 'success' ? 'rgba(57, 255, 20, 0.1)' : 'rgba(255, 0, 0, 0.1)';
+        statusEl.style.borderColor = type === 'success' ? 'var(--green)' : '#ff0000';
+        statusEl.style.color = type === 'success' ? 'var(--green)' : '#ff0000';
+        statusEl.classList.remove('hidden');
+
+        setTimeout(() => {
+            statusEl.classList.add('hidden');
+        }, 3000);
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            await fetch('/personalized-agent/health');
+        } catch (error) {
+            console.error('Failed to connect to server:', error);
+        }
+    });
+</script>
+</body>
+</html>
