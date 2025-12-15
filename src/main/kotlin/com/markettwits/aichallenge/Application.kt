@@ -2,6 +2,8 @@ package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.club.configureClubRoutes
 import com.markettwits.aichallenge.mcp.configureOrchestrationRoutes
+import com.markettwits.aichallenge.personalized.PersonalizedAgentService
+import com.markettwits.aichallenge.personalized.configurePersonalizedAgentRoutes
 import com.markettwits.aichallenge.rag.*
 import com.markettwits.aichallenge.team.TeamAssistantAgent
 import com.markettwits.aichallenge.team.TicketProcessor
@@ -320,11 +322,35 @@ fun main() {
         repositoryPath = projectRoot
     )
 
+    // Initialize Personalized Agent (Day 30)
+    var personalizedAgentService: PersonalizedAgentService? = null
+    if (lmStudioClient != null) {
+        println("👤 Initializing Personalized Agent (Day 30)...")
+        try {
+            personalizedAgentService = PersonalizedAgentService(
+                lmStudioClient = lmStudioClient,
+                configPath = "$projectRoot/data/personal_agent_config.json"
+            )
+            println("✅ Personalized Agent initialized successfully")
+            println("   📝 Config: ${personalizedAgentService.getConfig().profile.name} (${personalizedAgentService.getConfig().version})")
+            println("🌐 Personalized Agent UI: http://localhost:$port/personalized-agent.html")
+        } catch (e: Exception) {
+            println("❌ Failed to initialize Personalized Agent: ${e.message}")
+            e.printStackTrace()
+        }
+    } else {
+        println("⚠️  Personalized Agent requires LM Studio - skipping initialization")
+        println("   💡 Configure LOCAL_LLM_URL to enable personalized agent")
+    }
+
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
                 ignoreUnknownKeys = true
                 isLenient = true
+                coerceInputValues = true
+                encodeDefaults = true
+                allowStructuredMapKeys = true
             })
         }
 
@@ -376,6 +402,11 @@ fun main() {
 
         // Configure What's New routes (Day 24)
         configureWhatsNewRoutes(whatsNewService)
+
+        // Configure Personalized Agent routes (Day 30)
+        if (personalizedAgentService != null) {
+            configurePersonalizedAgentRoutes(personalizedAgentService)
+        }
 
         routing {
             staticResources("/", "static")
