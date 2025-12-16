@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Голосовой агент — Whisper + Claude | SportSauce AI</title>
+    <link href="assets/favicon.png" rel="icon" type="image/png">
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2F3F6E;
+            --primary-light: #5470B0;
+            --accent: #FF6B35;
+            --bg: #f6f8ff;
+            --text: #1F2937;
+            --muted: #6B7280;
+            --border: #E5E7EB;
+            --card: #ffffff;
+            --success: #10B981;
+            --danger: #EF4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #F8F9FF 0%, #E8ECFF 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .site-header {
+            background: var(--primary);
+            color: #fff;
+            padding: 14px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 8px 30px rgba(47, 63, 110, 0.25);
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+
+        .hero {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 22px;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.06);
+            margin-bottom: 18px;
+        }
+
+        .hero h1 {
+            margin: 0 0 8px 0;
+            color: var(--primary);
+            font-size: 26px;
+            letter-spacing: -0.01em;
+        }
+
+        .layout {
+            display: grid;
+            grid-template-columns: 1.1fr;
+            gap: 16px;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 18px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+        }
+
+        .status-chips {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 10px 0 16px 0;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            font-size: 13px;
+            background: #EEF2FF;
+            color: var(--primary);
+            border: 1px solid rgba(47, 63, 110, 0.15);
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.15);
+        }
+
+        .dot.warning {
+            background: var(--danger);
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.12);
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        button.record {
+            padding: 14px 18px;
+            border-radius: 14px;
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            box-shadow: 0 10px 30px rgba(47, 63, 110, 0.25);
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+
+        button.record:hover {
+            transform: translateY(-1px);
+        }
+
+        button.record:active {
+            transform: translateY(0);
+        }
+
+        button.record[disabled] {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        select, .pill {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            min-width: 190px;
+            font-weight: 600;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--muted);
+            font-weight: 500;
+        }
+
+        .waveform-container {
+            background: #F9FAFB;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 12px;
+            margin-top: 14px;
+        }
+
+        #waveform {
+            width: 100%;
+            height: 120px;
+            display: block;
+            border-radius: 10px;
+            background: radial-gradient(circle at 20% 30%, rgba(84, 112, 176, 0.08), transparent 40%),
+            radial-gradient(circle at 80% 70%, rgba(255, 107, 53, 0.08), transparent 35%),
+            #fff;
+            border: 1px solid var(--border);
+        }
+
+        .silence-hint {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .columns {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 14px;
+        }
+
+        h3 {
+            margin: 0 0 8px 0;
+            color: var(--primary);
+        }
+
+        .answer, .muted {
+            color: var(--muted);
+        }
+
+        .answer {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            color: var(--text);
+        }
+
+        .log {
+            max-height: 260px;
+            overflow-y: auto;
+            margin-top: 10px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .log-entry {
+            background: #F9FAFB;
+            border-radius: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .log-entry.error {
+            border-color: rgba(239, 68, 68, 0.25);
+            color: #B91C1C;
+        }
+
+        .log-entry.success {
+            border-color: rgba(16, 185, 129, 0.25);
+            color: #065F46;
+        }
+
+        @media (max-width: 700px) {
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            select, button.record, .pill {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<header class="site-header">
+    <a class="back-link" href="index.html">← На главную</a>
+    <div style="font-weight: 700;">Голосовой агент · Whisper → Claude</div>
+</header>
+
+<main>
+    <section class="hero">
+        <h1>Голосовые запросы к Claude</h1>
+        <p class="muted" style="margin:0;">Записываем речь, транскрибируем через Whisper и отправляем в Claude. Подходит
+            для быстрых запросов: «посчитай», «дай определение», «скажи анекдот».</p>
+    </section>
+
+    <div class="layout">
+        <div class="card">
+            <div class="status-chips">
+                <div class="status-chip" id="whisperStatus"><span class="dot"></span> Whisper</div>
+                <div class="status-chip" id="claudeStatus"><span class="dot"></span> Claude</div>
+                <div class="status-chip" id="stateStatus"><span class="dot"></span> Готово</div>
+            </div>
+
+            <div class="controls">
+                <button class="record" id="recordBtn">🎙️ Начать запись</button>
+                <select id="languageSelect" title="Подсказать язык Whisper (опционально)">
+                    <option value="">Автоопределение языка</option>
+                    <option value="ru">Русский</option>
+                    <option value="en">English</option>
+                    <option value="es">Español</option>
+                </select>
+                <div class="pill">Разрешите микрофон и говорите чётко. Повторное нажатие — остановка.</div>
+            </div>
+
+            <div class="waveform-container">
+                <div class="flex items-center justify-between"
+                     style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+                    <div class="text-sm" style="color: var(--muted);">Визуализация звука</div>
+                    <div class="pill" style="padding:6px 10px;font-size:12px;">Автостоп: 2 сек. тишины</div>
+                </div>
+                <canvas id="waveform"></canvas>
+                <div class="silence-hint" id="silenceHint">🔊 Ждём звук...</div>
+            </div>
+        </div>
+
+        <div class="columns">
+            <div class="card">
+                <h3>Транскрипт</h3>
+                <div class="muted" id="transcript">Пока пусто — нажмите «Начать запись».</div>
+            </div>
+            <div class="card">
+                <h3>Ответ Claude</h3>
+                <div class="answer muted" id="answer">Здесь появится результат модели.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3 style="margin-bottom:8px;">История</h3>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+</main>
+
+<script>
+    const recordBtn = document.getElementById('recordBtn');
+    const transcriptEl = document.getElementById('transcript');
+    const answerEl = document.getElementById('answer');
+    const logEl = document.getElementById('log');
+    const whisperStatus = document.getElementById('whisperStatus');
+    const claudeStatus = document.getElementById('claudeStatus');
+    const stateStatus = document.getElementById('stateStatus');
+    const languageSelect = document.getElementById('languageSelect');
+    const waveform = document.getElementById('waveform');
+    const silenceHint = document.getElementById('silenceHint');
+
+    let mediaRecorder;
+    let chunks = [];
+    let recording = false;
+    let mediaStream;
+    let audioContext;
+    let analyser;
+    let dataArray;
+    let rafId;
+    let lastSoundTime = 0;
+    const silenceThreshold = 0.012;
+    const silenceDurationMs = 2000;
+
+    function setState(text, color = 'var(--success)') {
+        stateStatus.querySelector('.dot').style.background = color;
+        stateStatus.querySelector('.dot').style.boxShadow = `0 0 0 6px ${color}33`;
+        stateStatus.lastChild.textContent = ' ' + text;
+    }
+
+    function pushLog(text, type = 'info') {
+        const entry = document.createElement('div');
+        entry.className = 'log-entry ' + (type === 'error' ? 'error' : 'success');
+        entry.textContent = text;
+        logEl.prepend(entry);
+    }
+
+    async function checkStatus() {
+        try {
+            const res = await fetch('/voice-assistant/status');
+            const data = await res.json();
+            const ok = data.available && data.whisperConfigured;
+
+            whisperStatus.querySelector('.dot').classList.toggle('warning', !data.whisperConfigured);
+            claudeStatus.querySelector('.dot').classList.toggle('warning', false);
+
+            if (!ok) {
+                recordBtn.disabled = true;
+                setState('Недоступно', 'var(--danger)');
+                pushLog(data.message || 'Голосовой агент не сконфигурирован', 'error');
+            } else {
+                recordBtn.disabled = false;
+                setState('Готово');
+            }
+        } catch (e) {
+            recordBtn.disabled = true;
+            setState('Ошибка статуса', 'var(--danger)');
+            pushLog('Не удалось получить статус: ' + e.message, 'error');
+        }
+    }
+
+    function stopVisualization() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        if (audioContext) {
+            audioContext.close();
+        }
+        audioContext = null;
+        analyser = null;
+        dataArray = null;
+    }
+
+    function drawWaveform() {
+        if (!analyser || !waveform) return;
+        const ctx = waveform.getContext('2d');
+        const width = waveform.width = waveform.clientWidth;
+        const height = waveform.height = waveform.clientHeight;
+
+        analyser.getByteTimeDomainData(dataArray);
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#2F3F6E';
+        ctx.beginPath();
+
+        const sliceWidth = width / dataArray.length;
+        let x = 0;
+        let sumSquares = 0;
+
+        for (let i = 0; i < dataArray.length; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * height / 2;
+            sumSquares += Math.pow(dataArray[i] - 128, 2);
+
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+            x += sliceWidth;
+        }
+
+        ctx.stroke();
+
+        const rms = Math.sqrt(sumSquares / dataArray.length) / 128;
+        const now = performance.now();
+        if (rms > silenceThreshold) {
+            lastSoundTime = now;
+            silenceHint.textContent = '🎙️ Говорите...';
+        } else {
+            const silentFor = now - lastSoundTime;
+            silenceHint.textContent = `🤫 Тишина ${Math.round(silentFor / 1000)}с`;
+            if (recording && silentFor > silenceDurationMs && mediaRecorder && mediaRecorder.state === 'recording') {
+                setState('Тишина, отправляем...');
+                stopRecording();
+                return;
+            }
+        }
+
+        rafId = requestAnimationFrame(drawWaveform);
+    }
+
+    function startVisualization() {
+        if (!mediaStream) return;
+        stopVisualization();
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        dataArray = new Uint8Array(analyser.fftSize);
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(analyser);
+        lastSoundTime = performance.now();
+        drawWaveform();
+    }
+
+    async function ensureRecorder() {
+        if (mediaRecorder) return;
+        mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
+        mediaRecorder = new MediaRecorder(mediaStream);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+
+        mediaRecorder.onstop = async () => {
+            setState('Отправляем...');
+            const blob = new Blob(chunks, {type: 'audio/webm'});
+            chunks = [];
+            stopVisualization();
+            await sendAudio(blob);
+        };
+    }
+
+    function stopRecording() {
+        if (!recording) return;
+        recording = false;
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
+            mediaRecorder.stop();
+        }
+        recordBtn.textContent = '🎙️ Начать запись';
+        setState('Обработка...');
+        stopVisualization();
+    }
+
+    async function startRecording() {
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            pushLog('Браузер не поддерживает запись аудио', 'error');
+            return;
+        }
+        await ensureRecorder();
+
+        if (recording) return;
+        recording = true;
+        lastSoundTime = performance.now();
+        mediaRecorder.start();
+        recordBtn.textContent = '■ Остановить запись';
+        setState('Слушаю...');
+        silenceHint.textContent = '🎙️ Говорите...';
+        startVisualization();
+    }
+
+    async function toggleRecording() {
+        if (recording) {
+            stopRecording();
+        } else {
+            await startRecording();
+        }
+    }
+
+    async function sendAudio(blob) {
+        const formData = new FormData();
+        formData.append('audio', blob, 'voice.webm');
+        if (languageSelect.value) {
+            formData.append('language', languageSelect.value);
+        }
+
+        try {
+            const res = await fetch('/voice-assistant', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || 'Сервер вернул ошибку');
+            }
+
+            const data = await res.json();
+            transcriptEl.textContent = data.transcript || '—';
+            answerEl.textContent = data.answer || '—';
+            pushLog(`✅ ${new Date().toLocaleTimeString()} · ${data.transcript}`, 'success');
+            setState('Готово');
+            silenceHint.textContent = '🔊 Ждём звук...';
+        } catch (e) {
+            pushLog('Ошибка: ' + e.message, 'error');
+            setState('Ошибка', 'var(--danger)');
+        }
+    }
+
+    recordBtn.addEventListener('click', () => {
+        toggleRecording().catch(err => {
+            pushLog(err.message, 'error');
+            setState('Ошибка', 'var(--danger)');
+        });
+    });
+
+    checkStatus();
+</script>
+</body>
+</html>

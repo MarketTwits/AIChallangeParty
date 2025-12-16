@@ -2,12 +2,15 @@ package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.DemoMcpIntegration.*
 import com.markettwits.aichallenge.rag.*
+import com.markettwits.aichallenge.voice.VoiceAssistantService
+import com.markettwits.aichallenge.voice.VoiceAssistantStatus
 import io.ktor.client.*
 import io.ktor.client.engine.cio.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
+import io.ktor.http.content.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -57,6 +60,8 @@ fun Application.configureRouting(
     localCoachAgent: LocalCoachAgent? = null,
     localLlmUrl: String = "",
     stacktraceAnalysisService: StacktraceAnalysisService? = null,
+    voiceAssistantService: VoiceAssistantService? = null,
+    whisperUrl: String = "",
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
@@ -312,6 +317,139 @@ fun Application.configureRouting(
 
         get("/health") {
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
+        }
+
+        get("/chat/sessions") {
+            try {
+                val pruned = repository.pruneOldConversations()
+                val sessions = repository.getSessionsInfo()
+                val serialized = sessions.map {
+                    mapOf(
+                        "sessionId" to it.sessionId,
+                        "messageCount" to it.messageCount,
+                        "lastMessageTime" to it.lastMessageTime
+                    )
+                }
+                call.respond(
+                    HttpStatusCode.OK,
+                    mapOf(
+                        "sessions" to serialized,
+                        "count" to serialized.size,
+                        "pruned" to pruned,
+                        "retentionDays" to 3
+                    )
+                )
+            } catch (e: Exception) {
+                logger.error("Error listing chat sessions", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to (e.message ?: "Failed to list sessions"))
+                )
+            }
+        }
+
+        delete("/chat/sessions/{sessionId}") {
+            try {
+                val sessionId = call.parameters["sessionId"] ?: return@delete call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Session ID is required")
+                )
+                sessionManager.getSession(sessionId)?.clearHistory(sessionId)
+                sessionManager.clearSession(sessionId)
+                repository.deleteSession(sessionId)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "deleted", "sessionId" to sessionId))
+            } catch (e: Exception) {
+                logger.error("Error deleting chat session", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to (e.message ?: "Failed to delete session"))
+                )
+            }
+        }
+
+        if (voiceAssistantService != null) {
+            post("/voice-assistant") {
+                try {
+                    val multipart = call.receiveMultipart()
+                    var audioBytes: ByteArray? = null
+                    var fileName = "voice.webm"
+                    var language: String? = null
+
+                    multipart.forEachPart { part ->
+                        when (part) {
+                            is PartData.FileItem -> {
+                                if (part.name == "audio" || part.name == "audio_file" || part.name == "file") {
+                                    audioBytes = part.streamProvider().use { it.readBytes() }
+                                    fileName = part.originalFileName ?: fileName
+                                }
+                            }
+
+                            is PartData.FormItem -> if (part.name == "language") {
+                                language = part.value.trim().ifBlank { null }
+                            }
+
+                            else -> {}
+                        }
+                        part.dispose()
+                    }
+
+                    if (audioBytes == null) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Audio file is required")
+                        )
+                    }
+
+                    val result = voiceAssistantService.handleAudio(
+                        audioBytes = audioBytes!!,
+                        fileName = fileName,
+                        language = language
+                    )
+                    call.respond(HttpStatusCode.OK, result)
+                } catch (e: IllegalStateException) {
+                    logger.warn("Invalid voice assistant request: ${e.message}")
+                    call.respond(
+                        HttpStatusCode.BadRequest,
+                        mapOf("error" to (e.message ?: "Invalid audio payload"))
+                    )
+                } catch (e: Exception) {
+                    logger.error("Error processing voice assistant request", e)
+                    call.respond(
+                        HttpStatusCode.InternalServerError,
+                        mapOf("error" to (e.message ?: "Failed to process audio"))
+                    )
+                }
+            }
+
+            get("/voice-assistant/status") {
+                call.respond(
+                    HttpStatusCode.OK,
+                    VoiceAssistantStatus(
+                        available = true,
+                        whisperConfigured = true,
+                        whisperUrl = whisperUrl.ifBlank { null }
+                    )
+                )
+            }
+        } else {
+            post("/voice-assistant") {
+                call.respond(
+                    HttpStatusCode.ServiceUnavailable,
+                    mapOf("error" to "Voice assistant is not configured. Set LOCAL_WHISPER_URL.")
+                )
+            }
+
+            get("/voice-assistant/status") {
+                call.respond(
+                    HttpStatusCode.OK,
+                    VoiceAssistantStatus(
+                        available = false,
+                        whisperConfigured = false,
+                        whisperUrl = whisperUrl.ifBlank { null },
+                        message = "Voice assistant is disabled. Configure LOCAL_WHISPER_URL."
+                    )
+                )
+            }
         }
 
         // GitHub Tools endpoint
