@@ -4,8 +4,10 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import org.jetbrains.exposed.sql.*
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.less
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
+import java.time.Duration
 
 object ConversationMessages : Table("conversation_messages") {
     val id = integer("id").autoIncrement()
@@ -20,6 +22,7 @@ object ConversationMessages : Table("conversation_messages") {
 class ConversationRepository(databasePath: String = "data/conversations.db") {
     private val logger = LoggerFactory.getLogger(ConversationRepository::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
+    private val retentionMillis = Duration.ofDays(3).toMillis()
 
     init {
         val dbFile = java.io.File(databasePath)
@@ -35,10 +38,12 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
             SchemaUtils.create(ConversationMessages)
         }
 
+        pruneOldConversations()
         logger.info("Database initialized at $databasePath")
     }
 
     fun saveMessage(sessionId: String, message: Message) {
+        pruneOldConversations()
         transaction {
             ConversationMessages.insert {
                 it[this.sessionId] = sessionId
@@ -50,6 +55,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
     }
 
     fun loadMessages(sessionId: String): List<Message> {
+        pruneOldConversations()
         return transaction {
             ConversationMessages.select { ConversationMessages.sessionId eq sessionId }
                 .orderBy(ConversationMessages.timestamp to SortOrder.ASC)
@@ -71,7 +77,16 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
         logger.info("Cleared conversation history for session: $sessionId")
     }
 
+    fun deleteSession(sessionId: String): Int {
+        val deleted = transaction {
+            ConversationMessages.deleteWhere { ConversationMessages.sessionId eq sessionId }
+        }
+        logger.info("Deleted session $sessionId (removed $deleted messages)")
+        return deleted
+    }
+
     fun getAllSessions(): List<String> {
+        pruneOldConversations()
         return transaction {
             ConversationMessages.slice(ConversationMessages.sessionId)
                 .selectAll()
@@ -87,6 +102,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
     )
 
     fun getSessionsInfo(): List<SessionInfo> {
+        pruneOldConversations()
         return transaction {
             ConversationMessages.selectAll()
                 .groupBy { it[ConversationMessages.sessionId] }
@@ -99,5 +115,16 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
                 }
                 .sortedByDescending { it.lastMessageTime }
         }
+    }
+
+    fun pruneOldConversations(): Int {
+        val cutoff = System.currentTimeMillis() - retentionMillis
+        val deleted = transaction {
+            ConversationMessages.deleteWhere { ConversationMessages.timestamp less cutoff }
+        }
+        if (deleted > 0) {
+            logger.info("Pruned $deleted old conversation messages older than ${retentionMillis / (1000 * 60 * 60 * 24)} days")
+        }
+        return deleted
     }
 }
