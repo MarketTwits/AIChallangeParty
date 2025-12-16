@@ -100,14 +100,46 @@ function updateContextProgress(totalInputTokens, contextLimit) {
     }
 }
 
-function getOrCreateSessionId() {
-    let sessionId = localStorage.getItem('currentSessionId');
-    if (!sessionId) {
-        sessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('currentSessionId', sessionId);
-        addSessionToList(sessionId);
-    }
-    return sessionId;
+let sessionsCache = [];
+let sessionId = null;
+
+function generateSessionId() {
+    return 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+}
+
+// Предустановим sessionId, чтобы обработчики ввода не работали с null до инициализации
+const storedInitial = localStorage.getItem('currentSessionId');
+if (storedInitial) {
+    sessionId = storedInitial;
+    addSessionToList(sessionId);
+} else {
+    sessionId = generateSessionId();
+    addSessionToList(sessionId);
+    localStorage.setItem('currentSessionId', sessionId);
+}
+updateSessionBadge();
+
+function getMergedSessions() {
+    const localIds = getLocalSessions();
+    const merged = [];
+    const seen = new Set();
+
+    sessionsCache.forEach(s => {
+        merged.push(s);
+        seen.add(s.sessionId);
+    });
+
+    localIds.forEach(id => {
+        if (!seen.has(id)) {
+            merged.push({
+                sessionId: id,
+                messageCount: 0,
+                lastMessageTime: null
+            });
+        }
+    });
+
+    return merged.sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
 }
 
 function addSessionToList(sessionId) {
@@ -118,37 +150,100 @@ function addSessionToList(sessionId) {
     }
 }
 
-function getAllSessions() {
+function removeSessionFromList(sessionId) {
+    let sessions = JSON.parse(localStorage.getItem('sessions') || '[]');
+    sessions = sessions.filter(s => s !== sessionId);
+    localStorage.setItem('sessions', JSON.stringify(sessions));
+}
+
+function getLocalSessions() {
     return JSON.parse(localStorage.getItem('sessions') || '[]');
 }
 
-function switchSession(sessionId) {
-    localStorage.setItem('currentSessionId', sessionId);
-    location.reload();
+function getAllSessions() {
+    const local = getLocalSessions();
+    const remote = sessionsCache.map(s => s.sessionId);
+    return Array.from(new Set([...remote, ...local]));
 }
 
-function createNewSession() {
-    const newSessionId = 'session_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-    localStorage.setItem('currentSessionId', newSessionId);
-    addSessionToList(newSessionId);
-    location.reload();
-}
-
-function deleteSession(sessionId) {
-    let sessions = getAllSessions();
-    sessions = sessions.filter(s => s !== sessionId);
-    localStorage.setItem('sessions', JSON.stringify(sessions));
-
-    if (localStorage.getItem('currentSessionId') === sessionId) {
-        if (sessions.length > 0) {
-            switchSession(sessions[0]);
-        } else {
-            createNewSession();
+async function fetchSessionsFromServer() {
+    try {
+        const res = await fetch('/chat/sessions');
+        if (!res.ok) {
+            throw new Error('Failed to load sessions');
         }
+        const data = await res.json();
+        sessionsCache = (data.sessions || []).sort((a, b) => (b.lastMessageTime || 0) - (a.lastMessageTime || 0));
+        sessionsCache.forEach(s => addSessionToList(s.sessionId));
+    } catch (e) {
+        console.warn('Cannot fetch sessions from server:', e.message);
+        sessionsCache = [];
     }
 }
 
-let sessionId = getOrCreateSessionId();
+function updateSessionBadge() {
+    const badge = document.getElementById('current-session-badge');
+    if (badge && sessionId) {
+        badge.textContent = sessionId;
+    }
+}
+
+async function switchSession(newSessionId) {
+    sessionId = newSessionId;
+    localStorage.setItem('currentSessionId', sessionId);
+    addSessionToList(sessionId);
+    updateSessionBadge();
+    await loadChatHistory(sessionId);
+    renderSessionsList();
+}
+
+async function createNewSession() {
+    const newSessionId = generateSessionId();
+    await switchSession(newSessionId);
+}
+
+async function initializeSessionFlow() {
+    await fetchSessionsFromServer();
+    const available = getAllSessions();
+    const stored = localStorage.getItem('currentSessionId');
+
+    if (stored && available.includes(stored)) {
+        sessionId = stored;
+    } else if (available.length > 0) {
+        sessionId = available[0];
+    } else {
+        sessionId = generateSessionId();
+    }
+
+    addSessionToList(sessionId);
+    updateSessionBadge();
+    await loadChatHistory(sessionId);
+    renderSessionsList();
+}
+
+async function deleteSession(sessionIdToDelete) {
+    try {
+        const res = await fetch(`/chat/sessions/${sessionIdToDelete}`, {method: 'DELETE'});
+        if (!res.ok) {
+            throw new Error('Ошибка при удалении диалога');
+        }
+        removeSessionFromList(sessionIdToDelete);
+        sessionsCache = sessionsCache.filter(s => s.sessionId !== sessionIdToDelete);
+
+        if (sessionId === sessionIdToDelete) {
+            if (getAllSessions().length > 0) {
+                await switchSession(getAllSessions()[0]);
+            } else {
+                await createNewSession();
+            }
+        } else {
+            renderSessionsList();
+        }
+    } catch (e) {
+        console.error('Failed to delete session:', e);
+        alert('Не удалось удалить диалог: ' + e.message);
+    }
+}
 
 let isExpanded = false;
 
@@ -1335,21 +1430,7 @@ if (clearChatBtn) {
         if (!confirmed) return;
 
         try {
-            const response = await fetch('/chat/clear', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    sessionId: sessionId
-                })
-            });
-
-            if (!response.ok) {
-                throw new Error('Ошибка при очистке диалога');
-            }
-
-            deleteSession(sessionId);
+            await deleteSession(sessionId);
         } catch (error) {
             console.error('Error clearing chat:', error);
             alert('Произошла ошибка при очистке диалога: ' + error.message);
@@ -1370,8 +1451,10 @@ const closeSessionsModal = document.getElementById('close-sessions-modal');
 
 if (sessionsListBtn && sessionsModal) {
     sessionsListBtn.addEventListener('click', () => {
-        renderSessionsList();
-        sessionsModal.classList.remove('hidden');
+        fetchSessionsFromServer().then(() => {
+            renderSessionsList();
+            sessionsModal.classList.remove('hidden');
+        });
     });
 }
 
@@ -1385,17 +1468,17 @@ function renderSessionsList() {
     const container = document.getElementById('sessions-list');
     if (!container) return;
 
-    const sessions = getAllSessions();
-    const currentSessionId = localStorage.getItem('currentSessionId');
+    const sessions = getMergedSessions();
+    const currentSessionId = sessionId;
 
     if (sessions.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-center py-4">Нет сохранённых диалогов</p>';
         return;
     }
 
-    container.innerHTML = sessions.map((sid, index) => {
-        const isCurrent = sid === currentSessionId;
-        const date = new Date(parseInt(sid.split('_')[1]));
+    container.innerHTML = sessions.map((s, index) => {
+        const isCurrent = s.sessionId === currentSessionId;
+        const date = s.lastMessageTime ? new Date(s.lastMessageTime) : new Date();
         const dateStr = date.toLocaleString('ru-RU');
 
         return `
@@ -1403,17 +1486,17 @@ function renderSessionsList() {
             isCurrent ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
         }">
                 <div class="flex-1">
-                    <div class="font-semibold">${isCurrent ? '🟢 ' : ''}Диалог ${index + 1}</div>
+                    <div class="font-semibold">${isCurrent ? '🟢 ' : ''}Диалог ${index + 1} (${s.messageCount || 0} сообщений)</div>
                     <div class="text-xs text-gray-500">${dateStr}</div>
                 </div>
                 <div class="flex space-x-2">
                     ${!isCurrent ? `
-                        <button onclick="switchSession('${sid}')"
+                        <button onclick="switchSession('${s.sessionId}')"
                                 class="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-sm">
                             Открыть
                         </button>
                     ` : ''}
-                    <button onclick="confirmDeleteSession('${sid}')"
+                    <button onclick="confirmDeleteSession('${s.sessionId}')"
                             class="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm">
                         Удалить
                     </button>
@@ -2549,7 +2632,7 @@ function initializeOrchestrationTab() {
 // Initialize chat history when page loads
 document.addEventListener('DOMContentLoaded', () => {
     loadCoachStyle();
-    loadChatHistory(sessionId);
+    initializeSessionFlow();
     initializeMcpSession();
 
     // Add tab switching for reminders

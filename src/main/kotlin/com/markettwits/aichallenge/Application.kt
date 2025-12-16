@@ -11,6 +11,8 @@ import com.markettwits.aichallenge.team.configureTeamRoutes
 import com.markettwits.aichallenge.tools.TeamToolManager
 import com.markettwits.aichallenge.tools.ToolManager
 import com.markettwits.aichallenge.tools.configureToolRoutes
+import com.markettwits.aichallenge.voice.VoiceAssistantService
+import com.markettwits.aichallenge.voice.WhisperClient
 import com.markettwits.aichallenge.whatsnew.WhatsNewService
 import com.markettwits.aichallenge.whatsnew.configureWhatsNewRoutes
 import io.github.cdimascio.dotenv.dotenv
@@ -50,6 +52,7 @@ fun main() {
 
     // Load Local LLM URL (optional, for Day 26)
     val localLlmUrl = dotenv["LOCAL_LLM_URL"] ?: System.getenv("LOCAL_LLM_URL") ?: ""
+    val localWhisperUrl = dotenv["LOCAL_WHISPER_URL"] ?: System.getenv("LOCAL_WHISPER_URL") ?: ""
 
     println("Loaded API Keys:")
     println("  ANTHROPIC_API_KEY: ${apiKey.take(10)}... (length: ${apiKey.length})")
@@ -63,6 +66,11 @@ fun main() {
         println("  LOCAL_LLM_URL: $localLlmUrl")
     } else {
         println("  LOCAL_LLM_URL: Not configured (local coach will not be available)")
+    }
+    if (localWhisperUrl.isNotEmpty()) {
+        println("  LOCAL_WHISPER_URL: $localWhisperUrl")
+    } else {
+        println("  LOCAL_WHISPER_URL: Not configured (voice agent will be disabled)")
     }
 
     val repository = ConversationRepository()
@@ -343,6 +351,25 @@ fun main() {
         println("   💡 Configure LOCAL_LLM_URL to enable personalized agent")
     }
 
+    // Initialize Voice Assistant (Day 31)
+    var voiceAssistantService: VoiceAssistantService? = null
+    if (localWhisperUrl.isNotEmpty()) {
+        try {
+            val whisperClient = WhisperClient(localWhisperUrl)
+            voiceAssistantService = VoiceAssistantService(
+                whisperClient = whisperClient,
+                anthropicClient = anthropicClient
+            )
+            println("🎙️  Voice assistant initialized with Whisper backend")
+            println("🌐 Voice Agent UI: http://localhost:$port/voice-assistant.html")
+        } catch (e: Exception) {
+            println("❌ Failed to initialize Voice Assistant: ${e.message}")
+        }
+    } else {
+        println("⚠️  LOCAL_WHISPER_URL not configured - Voice assistant disabled")
+        println("   💡 Add LOCAL_WHISPER_URL to .env to enable voice features")
+    }
+
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
         install(ContentNegotiation) {
             json(Json {
@@ -375,7 +402,9 @@ fun main() {
             anthropicClient,
             localCoachAgent,
             localLlmUrl,
-            stacktraceAnalysisService
+            stacktraceAnalysisService,
+            voiceAssistantService,
+            localWhisperUrl
         )
 
         // Configure MCP Orchestration routes (Day 14)
