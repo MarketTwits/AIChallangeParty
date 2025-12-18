@@ -79,7 +79,8 @@ data class ContentBlock(
     val name: String? = null,
     val input: JsonObject? = null,
     val tool_use_id: String? = null,
-    val content: String? = null
+    val content: String? = null,
+    val source: JsonObject? = null,
 )
 
 @Serializable
@@ -295,5 +296,4 @@ data class NotificationHistoryRecord(
     val timestamp: String,
     val sent: Boolean,
 )
-
 

@@ -2,6 +2,7 @@ package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.club.configureClubRoutes
 import com.markettwits.aichallenge.mcp.configureOrchestrationRoutes
+import com.markettwits.aichallenge.personalized.PersonalAssistantService
 import com.markettwits.aichallenge.personalized.PersonalizedAgentService
 import com.markettwits.aichallenge.personalized.configurePersonalizedAgentRoutes
 import com.markettwits.aichallenge.rag.*
@@ -90,6 +91,8 @@ fun main() {
 
     // Start reminder scheduler in background
     // reminderScheduler.start()
+
+    val anthropicFilesClient = AnthropicFilesClient(apiKey)
 
     // MCP integration service ready
     println("✅ MCP Integration Service initialized successfully")
@@ -351,11 +354,14 @@ fun main() {
         println("   💡 Configure LOCAL_LLM_URL to enable personalized agent")
     }
 
+    // Initialize Personal Assistant (Anthropic + optional Whisper)
+    var whisperClient: WhisperClient? = null
+    var personalAssistantService: PersonalAssistantService? = null
     // Initialize Voice Assistant (Day 31)
     var voiceAssistantService: VoiceAssistantService? = null
     if (localWhisperUrl.isNotEmpty()) {
         try {
-            val whisperClient = WhisperClient(localWhisperUrl)
+            whisperClient = WhisperClient(localWhisperUrl)
             voiceAssistantService = VoiceAssistantService(
                 whisperClient = whisperClient,
                 anthropicClient = anthropicClient
@@ -368,6 +374,20 @@ fun main() {
     } else {
         println("⚠️  LOCAL_WHISPER_URL not configured - Voice assistant disabled")
         println("   💡 Add LOCAL_WHISPER_URL to .env to enable voice features")
+    }
+
+    try {
+        personalAssistantService = PersonalAssistantService(
+            anthropicClient = anthropicClient,
+            anthropicFilesClient = anthropicFilesClient,
+            whisperClient = whisperClient,
+            repository = repository,
+            configPath = "$projectRoot/data/personal_agent_config.json"
+        )
+        println("🧭 Personal assistant initialized (text ready${if (whisperClient != null) ", voice ready" else ""})")
+        println("🌐 Personal Assistant UI: http://localhost:$port/personal-voice-assistant.html")
+    } catch (e: Exception) {
+        println("❌ Failed to initialize personal assistant: ${e.message}")
     }
 
     embeddedServer(Netty, port = port, host = "0.0.0.0") {
@@ -404,7 +424,8 @@ fun main() {
             localLlmUrl,
             stacktraceAnalysisService,
             voiceAssistantService,
-            localWhisperUrl
+            localWhisperUrl,
+            personalAssistantService
         )
 
         // Configure MCP Orchestration routes (Day 14)

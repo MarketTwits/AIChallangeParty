@@ -1,6 +1,7 @@
 package com.markettwits.aichallenge
 
 import com.markettwits.aichallenge.DemoMcpIntegration.*
+import com.markettwits.aichallenge.personalized.*
 import com.markettwits.aichallenge.rag.*
 import com.markettwits.aichallenge.voice.VoiceAssistantService
 import com.markettwits.aichallenge.voice.VoiceAssistantStatus
@@ -62,6 +63,7 @@ fun Application.configureRouting(
     stacktraceAnalysisService: StacktraceAnalysisService? = null,
     voiceAssistantService: VoiceAssistantService? = null,
     whisperUrl: String = "",
+    personalAssistantService: PersonalAssistantService? = null,
 ) {
     val logger = LoggerFactory.getLogger("Routes")
     val reasoningAgents = mutableMapOf<String, ReasoningAgent>()
@@ -449,6 +451,281 @@ fun Application.configureRouting(
                         message = "Voice assistant is disabled. Configure LOCAL_WHISPER_URL."
                     )
                 )
+            }
+        }
+
+        if (personalAssistantService != null) {
+            route("/personal-assistant") {
+                post("/chat") {
+                    try {
+                        val request = call.receive<PersonalAssistantChatRequest>()
+                        val response = personalAssistantService.chat(request)
+                        call.respond(HttpStatusCode.OK, response)
+                    } catch (e: IllegalArgumentException) {
+                        logger.warn("Invalid personal assistant chat request: ${e.message}")
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to e.message))
+                    } catch (e: Exception) {
+                        logger.error("Error in personal assistant chat", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to (e.message ?: "Failed to process chat"))
+                        )
+                    }
+                }
+
+                post("/voice") {
+                    try {
+                        val multipart = call.receiveMultipart()
+                        var audioBytes: ByteArray? = null
+                        var fileName = "voice.webm"
+                        var language: String? = null
+                        var sessionId: String? = null
+                        var profile: String? = null
+
+                        multipart.forEachPart { part ->
+                            when (part) {
+                                is PartData.FileItem -> {
+                                    if (part.name == "audio" || part.name == "audio_file" || part.name == "file") {
+                                        audioBytes = part.streamProvider().use { it.readBytes() }
+                                        fileName = part.originalFileName ?: fileName
+                                    }
+                                }
+
+                                is PartData.FormItem -> when (part.name) {
+                                    "language" -> language = part.value.trim().ifBlank { null }
+                                    "sessionId" -> sessionId = part.value.trim().ifBlank { null }
+                                    "profile" -> profile = part.value.trim().ifBlank { null }
+                                }
+
+                                else -> {}
+                            }
+                            part.dispose()
+                        }
+
+                        if (audioBytes == null) {
+                            return@post call.respond(
+                                HttpStatusCode.BadRequest,
+                                mapOf("error" to "Audio file is required")
+                            )
+                        }
+
+                        val result = personalAssistantService.handleVoice(
+                            audioBytes = audioBytes!!,
+                            fileName = fileName,
+                            sessionId = sessionId,
+                            language = language,
+                            profile = profile
+                        )
+
+                        call.respond(HttpStatusCode.OK, result)
+                    } catch (e: IllegalStateException) {
+                        logger.warn("Personal assistant voice request invalid: ${e.message}")
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (e.message ?: "Invalid audio payload"))
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Error processing personal assistant voice request", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to (e.message ?: "Failed to process audio"))
+                        )
+                    }
+                }
+
+                get("/status") {
+                    val status: PersonalAssistantStatus = personalAssistantService.getStatus(whisperUrl)
+                    call.respond(HttpStatusCode.OK, status)
+                }
+
+                get("/profiles") {
+                    val profiles: PersonalAssistantProfiles = personalAssistantService.getProfiles()
+                    call.respond(HttpStatusCode.OK, profiles)
+                }
+
+                get("/profiles/{name}") {
+                    val name = call.parameters["name"]
+                    val config = personalAssistantService.getProfile(name)
+                    call.respond(HttpStatusCode.OK, config)
+                }
+
+                put("/profiles/{name}") {
+                    try {
+                        val profileName = call.parameters["name"]
+                        val config = call.receive<PersonalAgentConfig>()
+                        personalAssistantService.updateProfile(profileName, config)
+                        call.respond(
+                            HttpStatusCode.OK,
+                            mapOf("status" to "updated", "profile" to (profileName ?: "default"))
+                        )
+                    } catch (e: Exception) {
+                        logger.error("Failed to update personal assistant profile", e)
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (e.message ?: "Failed to update profile"))
+                        )
+                    }
+                }
+
+                post("/profiles/{name}/activate") {
+                    val name = call.parameters["name"]
+                    if (name.isNullOrBlank()) {
+                        return@post call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to "Profile name is required")
+                        )
+                    }
+                    personalAssistantService.activateProfile(name)
+                    call.respond(HttpStatusCode.OK, mapOf("status" to "activated", "profile" to name))
+                }
+
+                get("/profile") {
+                    val config = personalAssistantService.getProfile()
+                    call.respond(HttpStatusCode.OK, config)
+                }
+
+                put("/profile") {
+                    try {
+                        val config = call.receive<PersonalAgentConfig>()
+                        personalAssistantService.updateProfile(null, config)
+                        call.respond(HttpStatusCode.OK, mapOf("status" to "updated", "profile" to "default"))
+                    } catch (e: Exception) {
+                        logger.error("Failed to update personal assistant profile", e)
+                        call.respond(
+                            HttpStatusCode.BadRequest,
+                            mapOf("error" to (e.message ?: "Failed to update profile"))
+                        )
+                    }
+                }
+
+                get("/prompt") {
+                    val prompt = personalAssistantService.getCompiledPrompt()
+                    call.respond(HttpStatusCode.OK, mapOf("prompt" to prompt))
+                }
+
+                post("/files") {
+                    try {
+                        val multipart = call.receiveMultipart()
+                        var fileBytes: ByteArray? = null
+                        var fileName = "upload.bin"
+                        var contentType = ContentType.Application.OctetStream.toString()
+
+                        multipart.forEachPart { part ->
+                            when (part) {
+                                is PartData.FileItem -> {
+                                    fileBytes = part.streamProvider().use { it.readBytes() }
+                                    fileName = part.originalFileName ?: fileName
+                                    contentType = part.contentType?.toString() ?: contentType
+                                }
+
+                                else -> {}
+                            }
+                            part.dispose()
+                        }
+
+                        if (fileBytes == null) {
+                            return@post call.respond(HttpStatusCode.BadRequest, mapOf("error" to "File is required"))
+                        }
+
+                        val uploaded: PersonalAssistantFile = personalAssistantService.uploadFile(
+                            fileName = fileName,
+                            bytes = fileBytes!!,
+                            contentType = contentType
+                        )
+                        call.respond(HttpStatusCode.OK, uploaded)
+                    } catch (e: Exception) {
+                        logger.error("Failed to upload file", e)
+                        call.respond(
+                            HttpStatusCode.InternalServerError,
+                            mapOf("error" to (e.message ?: "Failed to upload file"))
+                        )
+                    }
+                }
+
+                get("/files") {
+                    val files = personalAssistantService.listFiles()
+                    call.respond(HttpStatusCode.OK, PersonalAssistantFilesResponse(files = files, count = files.size))
+                }
+            }
+        } else {
+            route("/personal-assistant") {
+                post("/chat") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                post("/voice") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                get("/status") {
+                    call.respond(
+                        HttpStatusCode.OK,
+                        PersonalAssistantStatus(
+                            available = false,
+                            whisperConfigured = false,
+                            whisperUrl = whisperUrl.ifBlank { null },
+                            message = "Personal assistant is disabled."
+                        )
+                    )
+                }
+                get("/profile") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                put("/profile") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                get("/prompt") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                get("/profiles") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                get("/profiles/{name}") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                put("/profiles/{name}") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                post("/profiles/{name}/activate") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                post("/files") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
+                get("/files") {
+                    call.respond(
+                        HttpStatusCode.ServiceUnavailable,
+                        mapOf("error" to "Personal assistant is not configured.")
+                    )
+                }
             }
         }
 

@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta content="width=device-width, initial-scale=1.0" name="viewport">
+    <title>Личный ассистент — голос + текст</title>
+    <link href="assets/favicon.png" rel="icon" type="image/png">
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #2F3F6E;
+            --primary-light: #5470B0;
+            --accent: #FF6B35;
+            --bg: #F8F9FF;
+            --text: #1F2937;
+            --muted: #6B7280;
+            --border: #E5E7EB;
+            --card: #ffffff;
+        }
+
+        * {
+            box-sizing: border-box;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+
+        body {
+            margin: 0;
+            background: linear-gradient(135deg, #F8F9FF 0%, #E8ECFF 100%);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 24px;
+            background: var(--primary);
+            color: #fff;
+            box-shadow: 0 8px 30px rgba(47, 63, 110, 0.25);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .logo {
+            font-weight: 700;
+            letter-spacing: 0.02em;
+        }
+
+        .back {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        main {
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 18px;
+        }
+
+        .grid {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: 1.2fr 0.8fr;
+            align-items: start;
+        }
+
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            padding: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+        }
+
+        .card h2, .card h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        .status-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: #EEF2FF;
+            color: var(--primary);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.18);
+        }
+
+        .dot.off {
+            background: #EF4444;
+            box-shadow: 0 0 0 6px rgba(239, 68, 68, 0.18);
+        }
+
+        button.primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            border: none;
+            color: #fff;
+            font-weight: 700;
+            padding: 12px 18px;
+            border-radius: 12px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(47, 63, 110, 0.25);
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+
+        button.primary:hover {
+            transform: translateY(-1px);
+        }
+
+        button.primary:active {
+            transform: translateY(0);
+        }
+
+        button.secondary {
+            background: #fff;
+            color: var(--text);
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: #F9FAFB;
+            color: var(--text);
+            outline: none;
+        }
+
+        textarea {
+            min-height: 90px;
+            resize: vertical;
+        }
+
+        .flex {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .stack {
+            display: grid;
+            gap: 10px;
+        }
+
+        .waveform {
+            width: 100%;
+            height: 120px;
+            border-radius: 12px;
+            border: 1px dashed var(--border);
+            background: #fff;
+        }
+
+        .log {
+            max-height: 260px;
+            overflow-y: auto;
+            display: grid;
+            gap: 8px;
+        }
+
+        .log-entry {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            background: #F9FAFB;
+        }
+
+        .log-entry.error {
+            border-color: rgba(239, 68, 68, 0.25);
+            color: #B91C1C;
+        }
+
+        .pill {
+            padding: 8px 10px;
+            border-radius: 999px;
+            background: #EEF2FF;
+            color: var(--primary);
+            font-size: 13px;
+        }
+
+        .chat-bubble {
+            border-radius: 14px;
+            padding: 12px 14px;
+            border: 1px solid var(--border);
+            background: #fff;
+        }
+
+        .chat-bubble.user {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: #fff;
+        }
+
+        .chat-bubble.assistant {
+            background: #F9FAFB;
+        }
+
+        .chat-stream {
+            display: grid;
+            gap: 10px;
+            max-height: 320px;
+            overflow-y: auto;
+        }
+
+        .dropzone {
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            padding: 18px;
+            text-align: center;
+            background: #F9FAFB;
+            color: var(--muted);
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .dropzone.dragover {
+            border-color: var(--primary);
+            background: #EEF2FF;
+            color: var(--primary);
+        }
+
+        .attachments {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .attachment-pill {
+            background: #F1F5F9;
+            border: 1px solid var(--border);
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .spinner {
+            border: 3px solid #E5E7EB;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 40;
+        }
+
+        .modal {
+            background: #fff;
+            padding: 18px;
+            border-radius: 16px;
+            width: 420px;
+            max-width: 90%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal h3 {
+            margin: 0 0 10px 0;
+            color: var(--primary);
+        }
+
+        @media (max-width: 900px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+        }
+    </style>
+</head>
+<body>
+<header>
+    <a class="back" href="index.html">← На главную</a>
+    <div class="logo">Личный ассистент · голос + текст</div>
+    <div class="flex" style="gap:8px;">
+        <button class="secondary" id="profileMenuBtn">Профиль</button>
+        <div class="pill" id="sessionInfo">Сессия: —</div>
+    </div>
+</header>
+<main>
+    <div class="card">
+        <h2>Статус</h2>
+        <div class="status-row" id="statusRow">
+            <div class="chip"><span class="dot" id="voiceDot"></span> Голосовой ввод</div>
+            <div class="chip"><span class="dot" id="modelDot"></span> AI ядро</div>
+            <div class="chip"><span class="dot" id="profileDot"></span> Профиль</div>
+        </div>
+        <p class="muted" id="statusText" style="margin:8px 0 0 0;">Проверяем подключение...</p>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <h3>Голос</h3>
+            <div class="stack">
+                <div class="flex">
+                    <button class="primary" id="recordBtn">🎤 Начать запись</button>
+                    <select id="languageSelect" style="max-width: 180px;">
+                        <option value="">Авто язык</option>
+                        <option value="ru">Русский</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                    </select>
+                    <div class="pill">Автостоп: 2 c тишины</div>
+                </div>
+                <canvas class="waveform" id="waveform"></canvas>
+                <div class="muted" id="silenceHint">🔊 Ждём звук...</div>
+            </div>
+
+            <h3 style="margin-top:16px;">Текст</h3>
+            <div class="stack">
+                <textarea id="textInput" placeholder="Сформулируйте запрос или заметку..."></textarea>
+                <div class="flex">
+                    <input accept=".txt,text/plain,.pdf,application/pdf" id="attachFileInput" multiple style="flex:1;"
+                           type="file">
+                    <div class="pill">Поддерживаются только текстовые файлы и PDF</div>
+                </div>
+                <div class="flex" style="justify-content: space-between;">
+                    <div class="pill">Поддерживается история диалога</div>
+                    <button class="primary" id="sendTextBtn">Отправить</button>
+                </div>
+                <div class="dropzone" id="dropZone">Перетащите PDF или текстовые файлы сюда для прикрепления</div>
+                <div class="attachments" id="attachments"></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Ответ</h3>
+            <div class="stack">
+                <div>
+                    <div class="muted" style="font-size:13px;">Последний транскрипт</div>
+                    <div id="transcript">—</div>
+                </div>
+                <div>
+                    <div class="muted" style="font-size:13px;">Ответ</div>
+                    <div id="answer" style="white-space: pre-wrap; line-height: 1.6;">—</div>
+                </div>
+                <div class="chat-stream" id="chatStream"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-backdrop" id="profileModal">
+        <div class="modal">
+            <h3>Профили</h3>
+            <div class="stack">
+                <select id="profileSelect"></select>
+                <input id="profileKeyInput" placeholder="Имя профиля (ключ)">
+                <input id="nameInput" placeholder="Имя">
+                <input id="roleInput" placeholder="Роль">
+                <input id="occupationInput" placeholder="Профессия/фокус">
+                <input id="interestsInput" placeholder="Интересы через запятую">
+                <textarea id="factsInput" placeholder="Факты (по одному на строку)"></textarea>
+                <div class="flex" style="justify-content: flex-end;">
+                    <button class="secondary" id="loadProfileBtn">Обновить</button>
+                    <button class="secondary" id="activateProfileBtn">Сделать активным</button>
+                    <button class="primary" id="saveProfileBtn">Сохранить/создать</button>
+                </div>
+                <button class="secondary" id="closeProfileBtn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+    const recordBtn = document.getElementById('recordBtn');
+    const languageSelect = document.getElementById('languageSelect');
+    const textInput = document.getElementById('textInput');
+    const sendTextBtn = document.getElementById('sendTextBtn');
+    const transcriptEl = document.getElementById('transcript');
+    const answerEl = document.getElementById('answer');
+    const chatStream = document.getElementById('chatStream');
+    const voiceDot = document.getElementById('voiceDot');
+    const modelDot = document.getElementById('modelDot');
+    const profileDot = document.getElementById('profileDot');
+    const statusText = document.getElementById('statusText');
+    const waveform = document.getElementById('waveform');
+    const silenceHint = document.getElementById('silenceHint');
+    const sessionInfo = document.getElementById('sessionInfo');
+
+    const nameInput = document.getElementById('nameInput');
+    const roleInput = document.getElementById('roleInput');
+    const occupationInput = document.getElementById('occupationInput');
+    const interestsInput = document.getElementById('interestsInput');
+    const factsInput = document.getElementById('factsInput');
+    const profileSelect = document.getElementById('profileSelect');
+    const profileKeyInput = document.getElementById('profileKeyInput');
+    const activateProfileBtn = document.getElementById('activateProfileBtn');
+    const loadProfileBtn = document.getElementById('loadProfileBtn');
+    const saveProfileBtn = document.getElementById('saveProfileBtn');
+    const profileMenuBtn = document.getElementById('profileMenuBtn');
+    const closeProfileBtn = document.getElementById('closeProfileBtn');
+    const profileModal = document.getElementById('profileModal');
+    const attachFileInput = document.getElementById('attachFileInput');
+    const dropZone = document.getElementById('dropZone');
+    const attachmentsEl = document.getElementById('attachments');
+
+    let mediaRecorder, mediaStream, audioContext, analyser, dataArray, rafId;
+    let chunks = [];
+    let recording = false;
+    let lastSoundTime = 0;
+    const silenceThreshold = 0.012;
+    const silenceDurationMs = 2000;
+    let sessionId = localStorage.getItem('personalAssistantSession') || crypto.randomUUID();
+    localStorage.setItem('personalAssistantSession', sessionId);
+    sessionInfo.textContent = 'Сессия: ' + sessionId.slice(0, 8);
+    let activeProfile = 'default';
+    let isLoading = false;
+    let pendingFileIds = [];
+
+    function addMessage(role, text) {
+        if (!chatStream) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'chat-bubble ' + (role === 'user' ? 'user' : 'assistant');
+        wrap.textContent = text;
+        chatStream.appendChild(wrap);
+        chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
+    function setLoading(state, label = 'Отправка...') {
+        isLoading = state;
+        sendTextBtn.disabled = state;
+        recordBtn.disabled = state || recordBtn.disabled;
+        statusText.textContent = state ? label : 'Готов к работе.';
+    }
+
+    function pushLog(text, type = 'info') {
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble assistant';
+        bubble.textContent = `${new Date().toLocaleTimeString()} · ${text}`;
+        chatStream.appendChild(bubble);
+        chatStream.scrollTop = chatStream.scrollHeight;
+    }
+
+    function addAttachmentPill(label) {
+        const pill = document.createElement('div');
+        pill.className = 'attachment-pill';
+        pill.textContent = label;
+        attachmentsEl.appendChild(pill);
+    }
+
+    function setDot(dot, on) {
+        dot.classList.toggle('off', !on);
+    }
+
+    async function checkStatus() {
+        try {
+            const res = await fetch('/personal-assistant/status');
+            const data = await res.json();
+            const ok = data.available === true;
+            setDot(modelDot, ok);
+            setDot(voiceDot, data.whisperConfigured === true);
+            setDot(profileDot, true);
+            statusText.textContent = ok ? 'Готов к работе.' : (data.message || 'Ассистент недоступен');
+            recordBtn.disabled = !data.whisperConfigured;
+        } catch (e) {
+            statusText.textContent = 'Не удалось получить статус: ' + e.message;
+            setDot(modelDot, false);
+            setDot(voiceDot, false);
+            setDot(profileDot, false);
+            recordBtn.disabled = true;
+        } finally {
+            if (!isLoading) statusText.textContent = 'Готов к работе.';
+        }
+    }
+
+    function stopVisualization() {
+        if (rafId) cancelAnimationFrame(rafId);
+        rafId = null;
+        if (audioContext) audioContext.close();
+        audioContext = null;
+        analyser = null;
+        dataArray = null;
+    }
+
+    function drawWaveform() {
+        if (!analyser || !waveform) return;
+        const ctx = waveform.getContext('2d');
+        const width = waveform.width = waveform.clientWidth;
+        const height = waveform.height = waveform.clientHeight;
+
+        analyser.getByteTimeDomainData(dataArray);
+        ctx.clearRect(0, 0, width, height);
+        ctx.strokeStyle = '#22C55E';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        const sliceWidth = width / dataArray.length;
+        let x = 0;
+        let sumSquares = 0;
+        for (let i = 0; i < dataArray.length; i++) {
+            const v = dataArray[i] / 128.0;
+            const y = v * height / 2;
+            sumSquares += Math.pow(dataArray[i] - 128, 2);
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            x += sliceWidth;
+        }
+        ctx.stroke();
+
+        const rms = Math.sqrt(sumSquares / dataArray.length) / 128;
+        const now = performance.now();
+        if (rms > silenceThreshold) {
+            lastSoundTime = now;
+            silenceHint.textContent = '🎙️ Говорите...';
+        } else {
+            const silentFor = now - lastSoundTime;
+            silenceHint.textContent = `🤫 Тишина ${Math.round(silentFor / 1000)}с`;
+            if (recording && silentFor > silenceDurationMs && mediaRecorder?.state === 'recording') {
+                stopRecording();
+                return;
+            }
+        }
+        rafId = requestAnimationFrame(drawWaveform);
+    }
+
+    async function ensureRecorder() {
+        if (mediaRecorder) return;
+        mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
+        mediaRecorder = new MediaRecorder(mediaStream);
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) chunks.push(e.data);
+        };
+        mediaRecorder.onstop = async () => {
+            const blob = new Blob(chunks, {type: 'audio/webm'});
+            chunks = [];
+            stopVisualization();
+            await sendAudio(blob);
+        };
+    }
+
+    function startVisualization() {
+        if (!mediaStream) return;
+        stopVisualization();
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        dataArray = new Uint8Array(analyser.fftSize);
+        const source = audioContext.createMediaStreamSource(mediaStream);
+        source.connect(analyser);
+        lastSoundTime = performance.now();
+        drawWaveform();
+    }
+
+    async function startRecording() {
+        if (!navigator.mediaDevices || !window.MediaRecorder) {
+            pushLog('Браузер не поддерживает запись', 'error');
+            return;
+        }
+        await ensureRecorder();
+        if (recording) return;
+        recording = true;
+        mediaRecorder.start();
+        recordBtn.textContent = '■ Остановить';
+        silenceHint.textContent = '🎙️ Говорите...';
+        startVisualization();
+    }
+
+    function stopRecording() {
+        if (!recording) return;
+        recording = false;
+        if (mediaRecorder?.state === 'recording') mediaRecorder.stop();
+        recordBtn.textContent = '🎤 Начать запись';
+        silenceHint.textContent = '⏳ Обработка...';
+        stopVisualization();
+    }
+
+    async function sendAudio(blob) {
+        setLoading(true, 'Обработка аудио...');
+        const formData = new FormData();
+        formData.append('audio', blob, 'voice.webm');
+        formData.append('sessionId', sessionId);
+        formData.append('profile', activeProfile);
+        if (languageSelect.value) formData.append('language', languageSelect.value);
+        try {
+            const res = await fetch('/personal-assistant/voice', {method: 'POST', body: formData});
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            sessionId = data.sessionId || sessionId;
+            localStorage.setItem('personalAssistantSession', sessionId);
+            sessionInfo.textContent = `Сессия: ${sessionId.slice(0, 8)} · ${activeProfile}`;
+            transcriptEl.textContent = data.transcript || '—';
+            answerEl.textContent = data.answer || '—';
+            addMessage('user', data.transcript || '—');
+            addMessage('assistant', data.answer || '—');
+            pushLog(`Голос → ${data.transcript}`, 'info');
+            silenceHint.textContent = '🔊 Ждём звук...';
+        } catch (e) {
+            pushLog('Ошибка голоса: ' + e.message, 'error');
+            silenceHint.textContent = '⚠️ Ошибка';
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function sendText() {
+        const message = textInput.value.trim();
+        if (!message) return;
+        const newFiles = Array.from(attachFileInput.files || []);
+        let fileIds = [];
+        if (newFiles.length > 0) {
+            setLoading(true, 'Загружаем вложения...');
+            const uploadedIds = await uploadFilesForMessage(newFiles);
+            fileIds = fileIds.concat(uploadedIds);
+            attachFileInput.value = '';
+        }
+        if (pendingFileIds.length) {
+            fileIds = fileIds.concat(pendingFileIds);
+            pendingFileIds = [];
+            attachmentsEl.innerHTML = '';
+        }
+        setLoading(true, 'Отправляем запрос...');
+        try {
+            const res = await fetch('/personal-assistant/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message, sessionId, profile: activeProfile, fileIds})
+            });
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            sessionId = data.sessionId || sessionId;
+            localStorage.setItem('personalAssistantSession', sessionId);
+            sessionInfo.textContent = `Сессия: ${sessionId.slice(0, 8)} · ${activeProfile}`;
+            transcriptEl.textContent = message;
+            answerEl.textContent = data.response || '—';
+            addMessage('user', message);
+            addMessage('assistant', data.response || '—');
+            pushLog('Текст → ' + message, 'info');
+            textInput.value = '';
+        } catch (e) {
+            pushLog('Ошибка чата: ' + e.message, 'error');
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    async function loadProfilesList() {
+        try {
+            const res = await fetch('/personal-assistant/profiles');
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            activeProfile = data.active || 'default';
+            profileSelect.innerHTML = '';
+            (data.profiles || []).forEach(name => {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.textContent = name === data.active ? `${name} (active)` : name;
+                if (name === data.active) opt.selected = true;
+                profileSelect.appendChild(opt);
+            });
+            profileKeyInput.value = activeProfile;
+            setDot(profileDot, true);
+        } catch (e) {
+            pushLog('Не удалось загрузить список профилей: ' + e.message, 'error');
+            setDot(profileDot, false);
+        }
+    }
+
+    async function loadProfile(name) {
+        const target = name || profileSelect.value || 'default';
+        try {
+            const res = await fetch(`/personal-assistant/profiles/${encodeURIComponent(target)}`);
+            if (!res.ok) throw new Error(await res.text());
+            const cfg = await res.json();
+            nameInput.value = cfg.profile?.name || '';
+            roleInput.value = cfg.profile?.role || '';
+            occupationInput.value = cfg.profile?.occupation || '';
+            interestsInput.value = (cfg.profile?.interests || []).join(', ');
+            factsInput.value = (cfg.profile?.facts || []).join('\n');
+            profileKeyInput.value = target;
+            activeProfile = target;
+            sessionInfo.textContent = `Сессия: ${sessionId.slice(0, 8)} · ${activeProfile}`;
+            setDot(profileDot, true);
+        } catch (e) {
+            pushLog('Профиль не загружен: ' + e.message, 'error');
+            setDot(profileDot, false);
+        }
+    }
+
+    async function saveProfile() {
+        const profileName = profileKeyInput.value.trim() || profileSelect.value || 'default';
+        const payload = {
+            version: "1.0",
+            profile: {
+                name: nameInput.value.trim(),
+                role: roleInput.value.trim() || null,
+                occupation: occupationInput.value.trim() || null,
+                interests: interestsInput.value.split(',').map(v => v.trim()).filter(Boolean),
+                facts: factsInput.value.split('\n').map(v => v.trim()).filter(Boolean)
+            }
+        };
+        try {
+            const res = await fetch(`/personal-assistant/profiles/${encodeURIComponent(profileName)}`, {
+                method: 'PUT',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) throw new Error(await res.text());
+            pushLog(`Профиль "${profileName}" сохранён`, 'info');
+            await loadProfilesList();
+            await loadProfile(profileName);
+        } catch (e) {
+            pushLog('Ошибка сохранения профиля: ' + e.message, 'error');
+            setDot(profileDot, false);
+        }
+    }
+
+    async function activateProfile() {
+        const profileName = profileSelect.value || profileKeyInput.value.trim() || 'default';
+        try {
+            const res = await fetch(`/personal-assistant/profiles/${encodeURIComponent(profileName)}/activate`, {method: 'POST'});
+            if (!res.ok) throw new Error(await res.text());
+            activeProfile = profileName;
+            await loadProfilesList();
+            await loadProfile(profileName);
+            pushLog(`Профиль "${profileName}" активирован`, 'info');
+        } catch (e) {
+            pushLog('Не удалось активировать профиль: ' + e.message, 'error');
+        }
+    }
+
+    async function uploadFilesForMessage(files) {
+        const ids = [];
+        for (const file of files) {
+            if (!(file.type === 'application/pdf' || file.type === 'text/plain' || file.name.toLowerCase().endsWith('.pdf') || file.name.toLowerCase().endsWith('.txt'))) {
+                pushLog(`Пропущен файл ${file.name} — только PDF и текстовые`, 'error');
+                continue;
+            }
+            const formData = new FormData();
+            formData.append('file', file, file.name);
+            const res = await fetch('/personal-assistant/files', {method: 'POST', body: formData});
+            if (!res.ok) {
+                const text = await res.text();
+                pushLog('Ошибка загрузки: ' + text, 'error');
+                continue;
+            }
+            const data = await res.json();
+            if (data.id) ids.push(data.id);
+        }
+        return ids;
+    }
+
+    async function loadFiles() {
+        try {
+            const res = await fetch('/personal-assistant/files');
+            if (!res.ok) throw new Error(await res.text());
+            const data = await res.json();
+            fileSelect.innerHTML = '';
+            (data.files || []).forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f.id;
+                const label = [f.filename, f.sizeBytes ? `${(f.sizeBytes / 1024).toFixed(1)}KB` : null, f.id ? `#${f.id.slice(0, 8)}` : null]
+                    .filter(Boolean).join(' · ');
+                opt.textContent = label;
+                fileSelect.appendChild(opt);
+            });
+        } catch (e) {
+            pushLog('Не удалось загрузить список файлов: ' + e.message, 'error');
+        }
+    }
+
+    recordBtn.addEventListener('click', () => {
+        recording ? stopRecording() : startRecording().catch(err => pushLog(err.message, 'error'));
+    });
+    sendTextBtn.addEventListener('click', sendText);
+    textInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            sendText();
+        }
+    });
+    profileSelect.addEventListener('change', () => loadProfile(profileSelect.value));
+    loadProfileBtn.addEventListener('click', loadProfile);
+    saveProfileBtn.addEventListener('click', saveProfile);
+    activateProfileBtn.addEventListener('click', activateProfile);
+    profileMenuBtn.addEventListener('click', () => profileModal.style.display = 'flex');
+    closeProfileBtn.addEventListener('click', () => profileModal.style.display = 'none');
+
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, e => e.preventDefault());
+    });
+    ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.add('dragover'));
+    });
+    ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, () => dropZone.classList.remove('dragover'));
+    });
+    dropZone.addEventListener('drop', async (e) => {
+        const files = Array.from(e.dataTransfer.files || []);
+        const filtered = files.filter(f => f.type === 'application/pdf' || f.type === 'text/plain' || f.name.toLowerCase().endsWith('.pdf') || f.name.toLowerCase().endsWith('.txt'));
+        if (filtered.length === 0) {
+            pushLog('Доступны только PDF и текстовые файлы', 'error');
+            return;
+        }
+        setLoading(true, 'Загружаем вложения...');
+        const ids = await uploadFilesForMessage(filtered);
+        pendingFileIds = pendingFileIds.concat(ids);
+        ids.forEach(id => addAttachmentPill(`#${id.slice(0, 8)}`));
+        setLoading(false);
+    });
+
+    checkStatus();
+    loadProfilesList().then(() => loadProfile(activeProfile));
+</script>
+</body>
+</html>

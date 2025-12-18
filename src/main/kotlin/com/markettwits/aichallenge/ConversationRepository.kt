@@ -23,6 +23,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
     private val logger = LoggerFactory.getLogger(ConversationRepository::class.java)
     private val json = Json { ignoreUnknownKeys = true; isLenient = true }
     private val retentionMillis = Duration.ofDays(3).toMillis()
+    private val database: Database
 
     init {
         val dbFile = java.io.File(databasePath)
@@ -32,9 +33,9 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
             logger.info("Created database directory: ${dbDir.absolutePath}")
         }
 
-        Database.connect("jdbc:sqlite:$databasePath", "org.sqlite.JDBC")
+        database = Database.connect("jdbc:sqlite:$databasePath", "org.sqlite.JDBC")
 
-        transaction {
+        transaction(database) {
             SchemaUtils.create(ConversationMessages)
         }
 
@@ -44,7 +45,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
 
     fun saveMessage(sessionId: String, message: Message) {
         pruneOldConversations()
-        transaction {
+        transaction(database) {
             ConversationMessages.insert {
                 it[this.sessionId] = sessionId
                 it[role] = message.role
@@ -56,7 +57,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
 
     fun loadMessages(sessionId: String): List<Message> {
         pruneOldConversations()
-        return transaction {
+        return transaction(database) {
             ConversationMessages.select { ConversationMessages.sessionId eq sessionId }
                 .orderBy(ConversationMessages.timestamp to SortOrder.ASC)
                 .map { row ->
@@ -69,7 +70,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
     }
 
     fun clearHistory(sessionId: String) {
-        transaction {
+        transaction(database) {
             ConversationMessages.deleteWhere {
                 ConversationMessages.sessionId.eq(sessionId)
             }
@@ -78,7 +79,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
     }
 
     fun deleteSession(sessionId: String): Int {
-        val deleted = transaction {
+        val deleted = transaction(database) {
             ConversationMessages.deleteWhere { ConversationMessages.sessionId eq sessionId }
         }
         logger.info("Deleted session $sessionId (removed $deleted messages)")
@@ -87,7 +88,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
 
     fun getAllSessions(): List<String> {
         pruneOldConversations()
-        return transaction {
+        return transaction(database) {
             ConversationMessages.slice(ConversationMessages.sessionId)
                 .selectAll()
                 .withDistinct()
@@ -103,7 +104,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
 
     fun getSessionsInfo(): List<SessionInfo> {
         pruneOldConversations()
-        return transaction {
+        return transaction(database) {
             ConversationMessages.selectAll()
                 .groupBy { it[ConversationMessages.sessionId] }
                 .map { (sessionId, messages) ->
@@ -119,7 +120,7 @@ class ConversationRepository(databasePath: String = "data/conversations.db") {
 
     fun pruneOldConversations(): Int {
         val cutoff = System.currentTimeMillis() - retentionMillis
-        val deleted = transaction {
+        val deleted = transaction(database) {
             ConversationMessages.deleteWhere { ConversationMessages.timestamp less cutoff }
         }
         if (deleted > 0) {

@@ -43,6 +43,7 @@ class AnthropicClient(private val apiKey: String) {
         tools: List<Tool>? = null,
         systemPrompt: String? = null,
         temperature: Double? = null,
+        extraHeaders: Map<String, String>? = null,
     ): AnthropicResponse {
         val request = AnthropicRequest(
             model = model,
@@ -61,6 +62,7 @@ class AnthropicClient(private val apiKey: String) {
             val response: HttpResponse = client.post(apiUrl) {
                 header("x-api-key", apiKey)
                 header("anthropic-version", "2023-06-01")
+                extraHeaders?.forEach { (k, v) -> header(k, v) }
                 contentType(ContentType.Application.Json)
                 setBody(request)
             }
